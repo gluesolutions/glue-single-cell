@@ -2,11 +2,23 @@
 A glue dataclass that wraps an AnnData object
 
 The primary motivation is to support on-disk access
-to a sparse datatype
+to a sparse datatype that (even sparse) is too large
+to fit comfortably in memory.
 
-There is a lot in Data that will probably just work normally
-here. Maybe we should sub-class that instead?
+Another possibility is to store this data in a dual format,
+as both a native AnnData object AND as glue components.
+This would allow us to call scanpy functions on the AnnData
+object quite easily and without much additional bookkeeping.
 
+The anndata/scanpy convention of updating the data structure
+when new calculations are performed only works with glue if
+we are adding new components. 
+
+anndata - Annotated Data
+https://anndata.readthedocs.io/en/latest/
+
+Scanpy - Single-Cell Analysis in Python
+https://scanpy.readthedocs.io/en/stable/
 """
 
 from collections import OrderedDict
@@ -20,6 +32,9 @@ from glue.core.data import BaseCartesianData, Data
 from glue.core.component_id import ComponentID, ComponentIDDict
 from glue.core.component_id import ComponentIDList
 
+from glue.core.component_link import ComponentLink, CoordinateComponentLink
+from glue.core.exceptions import IncompatibleAttribute
+
 from glue.utils import (compute_statistic, unbroadcast, iterate_chunks,
     datetime64_to_mpl, broadcast_to, categorical_ndarray,
     format_choices, random_views_for_dask_array)
@@ -31,8 +46,10 @@ import anndata
 class DataAnnData(Data):
     def __init__(self, data, label="", coords=None, **kwargs):
         """
-        data is an AnnData object with a single sparse
-        matrix and (generally) with a filename backing
+        data is an AnnData object with a single data matrix of
+        shape #observations x #variables. This can be either
+        a dense numpy array or a scipy sparse array and can
+        be either in memory or (more typically) on disk.
         """
         super(BaseCartesianData, self).__init__()
         #print(data)
@@ -106,12 +123,34 @@ class DataAnnData(Data):
     def get_kind(self, cid):
         return 'numerical' #FIX -- we should not assume X is the only cid?
         
-    #def get_data(self, cid, view=None):
-    #    if view is not None:
-    #        subset = self.Xdata[view] #Maybe this makes a copy without file backing?
-    #    else:
-    #        subset = self.Xdata[:,:]
-    #    return subset.X #FIX -- we should not assume X is the only cid? 
+    def get_data(self, cid, view=None):
+    
+        if isinstance(cid, ComponentLink):
+            return cid.compute(self, view)
+
+        if cid in self._components:
+            comp = self._components[cid]
+        elif cid in self._externally_derivable_components:
+            comp = self._externally_derivable_components[cid]
+        else:
+            raise IncompatibleAttribute(cid)
+
+        if view is not None:
+            result = comp[view]
+        else:
+            if cid not in self._pixel_component_ids:
+                result = self.Xdata.X[:,:].data #This probably just loads everything into memory
+            else:
+                result = comp.data
+
+        return result
+        
+        
+        #if view is not None:
+        #    subset = self.Xdata[view] #Maybe this makes a copy without file backing?
+        #else:
+        #    subset = self.Xdata[:,:]
+        #return subset.X #FIX -- we should not assume X is the only cid? 
     
     def get_mask(self, subset_state, view=None):
         return subset_state.to_mask(self,view=view) #Is this sufficient?
@@ -135,12 +174,13 @@ class DataAnnData(Data):
         elif statistic == 'sum':
             return np.sum(self.Xdata.X,axis=axis) #We can't do the other way for this
         
-    def compute_histogram(self, cids, weights=None, range=None, bins=None, log=None, subset_state=None):
+    def compute_histogram(self, cids, weights=None, range=None, bins=None, log=None, subset_state=None, chunk_size=1000):
         """
         Compute an n-dimensional histogram with regularly spaced bins.
-        
-        Currently this only implements 1-D histograms.
-        
+
+        We restrict this to certain cids in order to enable fast histogram
+        calculations.
+
         Parameters
         ----------
         cids : list of str or `ComponentID`
@@ -156,11 +196,55 @@ class DataAnnData(Data):
         subset_state : `SubsetState`, optional
             If specified, the histogram will only take into account values in
             the subset state.
+        chunk_size : number of rows per chunk for calculating histogram
         """
+        from scipy.sparse import find
+        
+        #We should return a NotImplementedError if we try to do a histogram
+        #on anything that this not the gene/cell coords and X matrix
+        
         if len(cids) > 2:
             raise NotImplementedError()
         
         ndim = len(cids)
+        
+        if ndim == 1:
+            xmin, xmax = range[0]
+            xmin, xmax = sorted((xmin, xmax))
+            #keep = (x >= xmin) & (x <= xmax)
+        else:
+            (xmin, xmax), (ymin, ymax) = range
+            xmin, xmax = sorted((xmin, xmax))
+            ymin, ymax = sorted((ymin, ymax))
+            #keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+        
+        if ndim >= 1:
+            xmax += 10 * np.spacing(xmax)
+        if ndim >= 2:
+            ymax += 10 * np.spacing(ymax)
+                
+        if ndim == 1:
+            range = (xmin, xmax)
+            chunked_histogram = np.zeros(bins)
+            for chunk, start, end in self.Xdata.chunked_X(chunk_size):
+                x,y,w=find(chunk)
+                chunked_histogram += histogram1d(x+start, bins=bins, range=range, weights = w)
+            return chunked_histogram
+            
+        if ndim > 1:
+            range = [(xmin, xmax), (ymin, ymax)]
+            chunked_histogram = np.zeros((bins,bins))
+            for chunk, start, end in self.Xdata.chunked_X(chunk_size):
+                x,y,w=find(chunk)
+                chunked_histogram += np.histogram2d(x+start, y, bins=bins, range=range, weights = w)[0]
+            return chunked_histogram
+            
+            
+            
+        
+        
+        #return histogram2d(x = self.Xdata.X[:,:].nonzero()[0], y = self.Xdata.X[:,:].nonzero()[1],
+        #            bins=bins,range=range,weights=self.Xdata.X[:,:].data)
         
         x = self.get_data(cids[0])
         if isinstance(x, categorical_ndarray):
