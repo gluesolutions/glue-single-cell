@@ -14,6 +14,23 @@ The anndata/scanpy convention of updating the data structure
 when new calculations are performed only works with glue if
 we are adding new components. 
 
+Anndata objects include many things of different dimensions
+The native glue thing to do would be split the data object
+up into different datasets with defined links between them.
+
+*EACH* obsm will have to be a different glue dataset
+*EACH* varm will have to be a different glue dataset
+But var, obs, obsp, and varp can all be single glue datasets
+Only the X data matrix needs to be this special DataAnnData object
+(becuase all the other ones are pretty simple).
+
+We'll just have to do some indexing to connect things on indexes
+instead of on the obs_names and var_names directly. That's annoying, 
+but we can manage. 
+
+I do not know how to deal with obsp and varp, but we don't have these yet.
+Presumably these are very large. 
+
 anndata - Annotated Data
 https://anndata.readthedocs.io/en/latest/
 
@@ -27,7 +44,7 @@ import uuid
 import pandas as pd
 import numpy as np
 
-from glue.core.component import Component
+from glue.core.component import Component, CoordinateComponent, DerivedComponent
 from glue.core.data import BaseCartesianData, Data
 from glue.core.component_id import ComponentID, ComponentIDDict
 from glue.core.component_id import ComponentIDList
@@ -120,14 +137,59 @@ class DataAnnData(Data):
     #def main_components(self):
     #    return self._main_components
         
+    #def get_kind(self, cid):
+    #    return 'numerical' #FIX -- we should not assume X is the only cid?
+    @property
+    def main_components(self):
+        return [c for c in self.component_ids() if
+                not isinstance(self._components[c], (DerivedComponent, CoordinateComponent))]
+    
     def get_kind(self, cid):
-        return 'numerical' #FIX -- we should not assume X is the only cid?
+    
+        comp = self.get_component(cid)
         
+        try:
+            yo = comp.dtype
+        except AttributeError:
+            return 'numeric'
+        
+        if comp.datetime:
+            return 'datetime'
+        elif comp.numeric:
+            return 'numerical'
+        elif comp.categorical:
+            return 'categorical'
+        else:
+            raise TypeError("Unknown data kind")
+    
+    
     def get_data(self, cid, view=None):
+        """
+        This is the tricky function for anndata backed store, since
+        in general returning the full data object leads to memory problems.
+        
+        We also might have an issue that anndata does not support views
+        into other views, so we need to decompose things.
+        
+        glue_vaex chooses to return 10_000 data points in get_data, which is...
+        possibly not optimal.
+        
+        We could have get_data return an iterator directly. 
+        
+        get_data is not used directly very much, BUT might be a used a lot
+        via __getitem__ 
+        
+        So the following notes are maybe not important...
+        Scatter and Histogram use it for categorical data only
+        qt/mixins used it for mimeData. Unclear why we care.
+        data_derived uses it, but so what?
+        """
     
         if isinstance(cid, ComponentLink):
             return cid.compute(self, view)
 
+        #print(cid)
+        #print(self._components)
         if cid in self._components:
             comp = self._components[cid]
         elif cid in self._externally_derivable_components:
@@ -137,6 +199,8 @@ class DataAnnData(Data):
 
         if view is not None:
             result = comp[view]
+            if cid not in self._pixel_component_ids:
+                result = self.Xdata.X[view].data #This probably just loads everything into memory
         else:
             if cid not in self._pixel_component_ids:
                 result = self.Xdata.X[:,:].data #This probably just loads everything into memory
@@ -200,6 +264,8 @@ class DataAnnData(Data):
         """
         from scipy.sparse import find
         
+        
+        print(bins)
         #We should return a NotImplementedError if we try to do a histogram
         #on anything that this not the gene/cell coords and X matrix
         
@@ -225,15 +291,15 @@ class DataAnnData(Data):
                 
         if ndim == 1:
             range = (xmin, xmax)
-            chunked_histogram = np.zeros(bins)
+            chunked_histogram = np.zeros(bins[0])
             for chunk, start, end in self.Xdata.chunked_X(chunk_size):
                 x,y,w=find(chunk)
-                chunked_histogram += histogram1d(x+start, bins=bins, range=range, weights = w)
+                chunked_histogram += histogram1d(x+start, bins=bins[0], range=range, weights = w)
             return chunked_histogram
             
         if ndim > 1:
             range = [(xmin, xmax), (ymin, ymax)]
-            chunked_histogram = np.zeros((bins,bins))
+            chunked_histogram = np.zeros(bins)
             for chunk, start, end in self.Xdata.chunked_X(chunk_size):
                 x,y,w=find(chunk)
                 chunked_histogram += np.histogram2d(x+start, y, bins=bins, range=range, weights = w)[0]
