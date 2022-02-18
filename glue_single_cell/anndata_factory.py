@@ -58,9 +58,9 @@ def read_anndata(file_name):
     """
     Use AnnData to read a file from disk
     
-    Currently supports .loom and .h5ad files
-    
-    
+    Currently supports .loom and .h5ad files, but .loom files
+    are read into memory (anndata library does not support
+    a file-backed mode for them) which may cause memory issues.
     """
     list_of_data_objs = []
     basename = Path(file_name).stem
@@ -84,7 +84,6 @@ def read_anndata(file_name):
         var_data.meta['anndatatype'] = 'var Array'
         var_data.meta['join_on_obs'] = False
         var_data.meta['join_on_var'] = True
-    
     
         list_of_data_objs.append(var_data)
     except:

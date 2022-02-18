@@ -5,14 +5,16 @@ The primary motivation is to support on-disk access
 to a sparse datatype that (even sparse) is too large
 to fit comfortably in memory.
 
-Another possibility is to store this data in a dual format,
-as both a native AnnData object AND as glue components.
-This would allow us to call scanpy functions on the AnnData
-object quite easily and without much additional bookkeeping.
+We store this data in a dual format, as both a native AnnData 
+object AND as glue components. This allows us to call scanpy
+functions on the AnnData object quite easily and without much
+additional bookkeeping.
 
-The anndata/scanpy convention of updating the data structure
-when new calculations are performed only works with glue if
-we are adding new components. 
+TODO: The anndata/scanpy convention of updating the data
+structure when new calculations are performed only works
+with glue if we know how to add components to the appropriate
+glue datasets (which currently are only linked-by-key) in a 
+loose way, and should probably be more tightly coupled. 
 
 Anndata objects include many things of different dimensions
 The native glue thing to do would be split the data object
@@ -24,12 +26,15 @@ But var, obs, obsp, and varp can all be single glue datasets
 Only the X data matrix needs to be this special DataAnnData object
 (becuase all the other ones are pretty simple).
 
-We'll just have to do some indexing to connect things on indexes
-instead of on the obs_names and var_names directly. That's annoying, 
-but we can manage. 
-
 I do not know how to deal with obsp and varp, but we don't have these yet.
 Presumably these are very large. 
+
+
+Because of automatic sanitization 
+(see __[this issue](https://github.com/theislab/scanpy/issues/1747)__)
+ we have to sanitize the full dataset, and cannot just do the subset. 
+ Perhaps we should just go ahead and do this at load time, if 
+ that will not cause issues.
 
 anndata - Annotated Data
 https://anndata.readthedocs.io/en/latest/
@@ -51,26 +56,69 @@ from glue.core.component_id import ComponentIDList
 
 from glue.core.component_link import ComponentLink, CoordinateComponentLink
 from glue.core.exceptions import IncompatibleAttribute
-
-from glue.utils import (compute_statistic, unbroadcast, iterate_chunks,
-    datetime64_to_mpl, broadcast_to, categorical_ndarray,
-    format_choices, random_views_for_dask_array)
     
 from fast_histogram import histogram1d, histogram2d
 
 import anndata
+import scanpy
+
+def get_subset(subset_name, data_collection):
+    """
+    Return a view of the anndata object that corresponds
+    to the desired subset
+    """
+    slice_list = get_subset_mask(subset_name, data_collection)
+    
+    for dataset in data_collection:
+        if isinstance(dataset, DataAnnData):
+            goodsubset = None
+            try:
+                goodsubset = dataset.Xdata[slice_list,:]
+            except:
+                goodsubset = dataset.Xdata[:,slice_list]
+            if goodsubset:
+                return goodsubset
+                
+def get_subset_mask(subset_name, data_collection):
+    """
+    Get a subset mask for a given subset_name by
+    trying to get the mask for all datasets in the
+    data_collection.
+    """
+    for subset in data_collection.subset_groups:
+        if subset.label == subset_name:
+            target_subset = subset
+    for subset_on_data in target_subset.subsets:
+        try:
+            list_of_obs = subset_on_data.to_mask()
+            return list_of_obs
+        except: #IncompatibleAttribute?
+            pass
+
 
 class DataAnnData(Data):
+    
     def __init__(self, data, label="", coords=None, **kwargs):
         """
         data is an AnnData object with a single data matrix of
         shape #observations x #variables. This can be either
         a dense numpy array or a scipy sparse array and can
         be either in memory or (more typically) on disk.
+        
+        The other components of an AnnData object:
+        var, obs, varm, obsm are stored as separate (regular)
+        glue data objects, because they have different
+        dimensions. They are connected to this data object
+        through join_on_key relations. See anndata_factory.py
+        for how this is done in the loader.
         """
         super(BaseCartesianData, self).__init__()
         #print(data)
+        #We sanitize the underlying data array because
+        #A) Currently, many scanpy functions call sanitize_anndata()
+        #B) sanitize does not work on a slice/subset, so we do it here
         self.Xdata = data
+        scanpy._utils.sanitize_anndata(self.Xdata)
         self.label = label
 
         self._shape = ()
@@ -91,54 +139,35 @@ class DataAnnData(Data):
 
         self.edit_subset = None
 
-        #for lbl, data in sorted(kwargs.items()):
-        #    self.add_component(data, lbl)
-
         self._key_joins = {}
 
-        #self.add_component(data,'X')
         component_id = ComponentID(label='X', parent=self)
         comp_to_add = Component(self.Xdata)
         self.add_component(comp_to_add,label=component_id)
         self._components[component_id] = comp_to_add
-        #self._create_pixel_and_world_components(ndim=2)
-        #self._shape = self.Xdata.shape
-        
-        
-        #if self.hub and not is_present:
-        #    msg = DataAddComponentMessage(self, component_id)
-        #    self.hub.broadcast(msg)
-        #    msg = ComponentsChangedMessage(self)
-        #    self.hub.broadcast(msg)
-            
+        self._shape = self.Xdata.shape
+        self._label = label
         # To avoid circular references when saving objects with references to
         # the data, we make sure that all Data objects have a UUID that can
         # uniquely identify them.
         self.uuid = str(uuid.uuid4())
               
-    #@property
-    #def label(self):
-    #    return self._label
-    
-    #@label.setter
-    #def label(self, value):
-    #    if getattr(self, '_label', None) != value:
-    #        self._label = value
-    #        self.broadcast(attribute='label')
-    #    elif value is None:
-    #        self._label = value
-    
-    
-    #@property
-    #def shape(self):
-    #    return self.Xdata.shape
-    
-    #@property
-    #def main_components(self):
-    #    return self._main_components
-        
-    #def get_kind(self, cid):
-    #    return 'numerical' #FIX -- we should not assume X is the only cid?
+    @property
+    def label(self):
+        return self._label
+
+    @label.setter
+    def label(self, value):
+        if getattr(self, '_label', None) != value:
+            self._label = value
+            self.broadcast(attribute='label')
+        elif value is None:
+            self._label = value
+
+    @property
+    def shape(self):
+        return self._shape
+
     @property
     def main_components(self):
         return [c for c in self.component_ids() if
@@ -149,8 +178,8 @@ class DataAnnData(Data):
         comp = self.get_component(cid)
         
         try:
-            yo = comp.dtype
-        except AttributeError:
+            dtype = comp.dtype
+        except AttributeError: #This will happen for AnnData component
             return 'numeric'
         
         if comp.datetime:
@@ -178,18 +207,11 @@ class DataAnnData(Data):
         
         get_data is not used directly very much, BUT might be a used a lot
         via __getitem__ 
-        
-        So the following notes are maybe not important...
-        Scatter and Histogram use it for categorical data only
-        qt/mixins used it for mimeData. Unclear why we care.
-        data_derived uses it, but so what?
         """
     
         if isinstance(cid, ComponentLink):
             return cid.compute(self, view)
 
-        #print(cid)
-        #print(self._components)
         if cid in self._components:
             comp = self._components[cid]
         elif cid in self._externally_derivable_components:
@@ -208,17 +230,10 @@ class DataAnnData(Data):
                 result = comp.data
 
         return result
-        
-        
-        #if view is not None:
-        #    subset = self.Xdata[view] #Maybe this makes a copy without file backing?
-        #else:
-        #    subset = self.Xdata[:,:]
-        #return subset.X #FIX -- we should not assume X is the only cid? 
-    
+
     def get_mask(self, subset_state, view=None):
         return subset_state.to_mask(self,view=view) #Is this sufficient?
-        
+
     def compute_statistic(self, statistic, cid,
                           axis=None, finite=True,
                           positive=False, subset_state=None,
@@ -304,85 +319,3 @@ class DataAnnData(Data):
                 x,y,w=find(chunk)
                 chunked_histogram += np.histogram2d(x+start, y, bins=bins, range=range, weights = w)[0]
             return chunked_histogram
-            
-            
-            
-        
-        
-        #return histogram2d(x = self.Xdata.X[:,:].nonzero()[0], y = self.Xdata.X[:,:].nonzero()[1],
-        #            bins=bins,range=range,weights=self.Xdata.X[:,:].data)
-        
-        x = self.get_data(cids[0])
-        if isinstance(x, categorical_ndarray):
-            x = x.codes
-        if ndim > 1:
-            y = self.get_data(cids[1])
-            if isinstance(y, categorical_ndarray):
-                y = y.codes
-        
-        if weights is not None:
-            w = self.get_data(weights)
-            if isinstance(w, categorical_ndarray):
-                w = w.codes
-        else:
-            w = None
-        
-        if subset_state is not None:
-            mask = self.get_mask(subset_state)#.to_mask(self)
-            x = x[mask]
-            if ndim > 1:
-                y = y[mask]
-            if w is not None:
-                w = w[mask]
-        
-        if ndim == 1:
-            xmin, xmax = range[0]
-            xmin, xmax = sorted((xmin, xmax))
-            keep = (x >= xmin) & (x <= xmax)
-        else:
-            (xmin, xmax), (ymin, ymax) = range
-            xmin, xmax = sorted((xmin, xmax))
-            ymin, ymax = sorted((ymin, ymax))
-            keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
-        
-        x = x[keep]
-        if ndim > 1:
-            y = y[keep]
-        if w is not None:
-            print(keep)
-            w = w[keep]
-        
-        if len(x) == 0:
-            return np.zeros(bins)
-        
-        if ndim > 1 and len(y) == 0:
-            return np.zeros(bins)
-        
-        if log is not None and log[0]:
-            if xmin < 0 or xmax < 0:
-                return np.zeros(bins)
-            xmin = np.log10(xmin)
-            xmax = np.log10(xmax)
-            x = np.log10(x)
-        
-        if ndim > 1 and log is not None and log[1]:
-            if ymin < 0 or ymax < 0:
-                return np.zeros(bins)
-            ymin = np.log10(ymin)
-            ymax = np.log10(ymax)
-            y = np.log10(y)
-        
-        # By default fast-histogram drops values that are exactly xmax, so we
-        # increase xmax very slightly to make sure that this doesn't happen, to
-        # be consistent with np.histogram.
-        if ndim >= 1:
-            xmax += 10 * np.spacing(xmax)
-        if ndim >= 2:
-            ymax += 10 * np.spacing(ymax)
-        
-        if ndim == 1:
-            range = (xmin, xmax)
-            return histogram1d(x, range=range, bins=bins[0], weights=w)
-        elif ndim > 1:
-            range = [(xmin, xmax), (ymin, ymax)]
-            return histogram2d(x, y, range=range, bins=bins, weights=w)
