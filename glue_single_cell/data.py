@@ -1,40 +1,40 @@
 """
-A glue dataclass that wraps an AnnData object
+A glue Dataclass that wraps an AnnData object
 
 The primary motivation is to support on-disk access
-to a sparse datatype that (even sparse) is too large
+to a dataset that (even sparse) may be too large
 to fit comfortably in memory.
 
-We store this data in a dual format, as both a native AnnData 
+We store this data in a dual format, as both a native AnnData
 object AND as glue components. This allows us to call scanpy
-functions on the AnnData object quite easily and without much
-additional bookkeeping.
+functions on the AnnData object without much additional
+bookkeeping. 
+
+AnnData objects include many things of different dimensions.
+This DataAnnData class only exposes the X matrix of
+raw data values with dimension num_obs x num_vars as a glue
+component. The other parts of the AnnData object are
+stores as regular glue data objects -- their creation and
+linking with the DataAnnData is handled by the data loader.
+
+*EACH* obsm is a different glue dataset
+*EACH* varm is a different glue dataset
+But var, obs, obsp, and varp can all be single glue datasets
+
+However, the obsp and varp could be extremely large. We do
+not deal with these yet.
+
+Because of automatic sanitization 
+(see __[this issue](https://github.com/theislab/scanpy/issues/1747)__)
+we generally have to sanitize an AnnData object before using it in
+Scanpy. Since sanitization cannot be done on a subset, we sanitize
+the full dataset at initialization time.
 
 TODO: The anndata/scanpy convention of updating the data
 structure when new calculations are performed only works
 with glue if we know how to add components to the appropriate
 glue datasets (which currently are only linked-by-key) in a 
 loose way, and should probably be more tightly coupled. 
-
-Anndata objects include many things of different dimensions
-The native glue thing to do would be split the data object
-up into different datasets with defined links between them.
-
-*EACH* obsm will have to be a different glue dataset
-*EACH* varm will have to be a different glue dataset
-But var, obs, obsp, and varp can all be single glue datasets
-Only the X data matrix needs to be this special DataAnnData object
-(becuase all the other ones are pretty simple).
-
-I do not know how to deal with obsp and varp, but we don't have these yet.
-Presumably these are very large. 
-
-
-Because of automatic sanitization 
-(see __[this issue](https://github.com/theislab/scanpy/issues/1747)__)
- we have to sanitize the full dataset, and cannot just do the subset. 
- Perhaps we should just go ahead and do this at load time, if 
- that will not cause issues.
 
 anndata - Annotated Data
 https://anndata.readthedocs.io/en/latest/
@@ -62,21 +62,34 @@ from fast_histogram import histogram1d, histogram2d
 import anndata
 import scanpy
 
-def get_subset(subset_name, data_collection):
+def get_subset(subset_name, data_collection, save_to_disk=False):
     """
     Return a view of the anndata object that corresponds
     to the desired subset
     """
-    slice_list = get_subset_mask(subset_name, data_collection)
+    slice_list,uuid = get_subset_mask(subset_name, data_collection)
     
     for dataset in data_collection:
-        if isinstance(dataset, DataAnnData):
+        try:
+            data_uuid = dataset.meta['Xdata']
+            orig_filename = dataset.meta['orig_filename']
+        except KeyError:
+            return None
+        if isinstance(dataset, DataAnnData) and (data_uuid == uuid):
             goodsubset = None
             try:
                 goodsubset = dataset.Xdata[slice_list,:]
-            except:
+            except IndexError:
                 goodsubset = dataset.Xdata[:,slice_list]
             if goodsubset:
+                if save_to_disk:
+                    new_filename = f'{orig_filename}_{subset_name.replace(" ","")}.h5ad'
+                    newadata = goodsubset.copy(filename=new_filename) #This creates the file but leaves if open in the original mode
+                    newadata.file.close() #So we close it
+                    goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
+                    print(f"Subset is being written to disk as {new_filename}")                
+                else:
+                    print(f"Subset is defined as a slice of the full dataset at {orig_filename}. To save this subset as a new object to disk, re-run this command with save_to_disk=True")    
                 return goodsubset
                 
 def get_subset_mask(subset_name, data_collection):
@@ -85,14 +98,22 @@ def get_subset_mask(subset_name, data_collection):
     trying to get the mask for all datasets in the
     data_collection.
     """
+    target_subset = None
     for subset in data_collection.subset_groups:
         if subset.label == subset_name:
             target_subset = subset
+    if target_subset == None:
+        print(f"Subset {subset_name} not found. Is this subset defined?")
+        return None
     for subset_on_data in target_subset.subsets:
         try:
             list_of_obs = subset_on_data.to_mask()
-            return list_of_obs
-        except: #IncompatibleAttribute?
+            try:
+                uuid = subset_on_data.data.meta['Xdata']
+            except KeyError:
+                uuid = None
+            return list_of_obs, uuid
+        except IncompatibleAttribute:
             pass
 
 
@@ -113,7 +134,6 @@ class DataAnnData(Data):
         for how this is done in the loader.
         """
         super(BaseCartesianData, self).__init__()
-        #print(data)
         #We sanitize the underlying data array because
         #A) Currently, many scanpy functions call sanitize_anndata()
         #B) sanitize does not work on a slice/subset, so we do it here
@@ -200,13 +220,7 @@ class DataAnnData(Data):
         We also might have an issue that anndata does not support views
         into other views, so we need to decompose things.
         
-        glue_vaex chooses to return 10_000 data points in get_data, which is...
-        possibly not optimal.
-        
         We could have get_data return an iterator directly. 
-        
-        get_data is not used directly very much, BUT might be a used a lot
-        via __getitem__ 
         """
     
         if isinstance(cid, ComponentLink):
@@ -225,7 +239,7 @@ class DataAnnData(Data):
                 result = self.Xdata.X[view].data #This probably just loads everything into memory
         else:
             if cid not in self._pixel_component_ids:
-                result = self.Xdata.X[:,:].data #This probably just loads everything into memory
+                result = self.Xdata.X[:,:].data #This loads everything into memory
             else:
                 result = comp.data
 
@@ -279,9 +293,7 @@ class DataAnnData(Data):
         """
         from scipy.sparse import find
         
-        
-        print(bins)
-        #We should return a NotImplementedError if we try to do a histogram
+        #TODO: We should return a NotImplementedError if we try to do a histogram
         #on anything that this not the gene/cell coords and X matrix
         
         if len(cids) > 2:
@@ -292,12 +304,10 @@ class DataAnnData(Data):
         if ndim == 1:
             xmin, xmax = range[0]
             xmin, xmax = sorted((xmin, xmax))
-            #keep = (x >= xmin) & (x <= xmax)
         else:
             (xmin, xmax), (ymin, ymax) = range
             xmin, xmax = sorted((xmin, xmax))
             ymin, ymax = sorted((ymin, ymax))
-            #keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
         
         if ndim >= 1:
             xmax += 10 * np.spacing(xmax)
