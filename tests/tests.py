@@ -18,6 +18,12 @@ print(BASE_DIR)
 SPARSE_BACKED_OBS_NUM = 500
 SPARSE_BACKED_VAR_NUM = 700
 
+def print_size_in_MB(x):
+    """
+    Convenience method for computing the size of objects
+    """
+    print('{:.3} MB'.format(x.__sizeof__()/1e6))
+
 @pytest.fixture
 def data_sparse_backed():
     rs = RandomState(12345)

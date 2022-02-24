@@ -59,10 +59,12 @@ from glue.core.exceptions import IncompatibleAttribute
     
 from fast_histogram import histogram1d, histogram2d
 
+from glue.core import data_factories as df
+
 import anndata
 import scanpy
 
-def get_subset(subset_name, data_collection, save_to_disk=False):
+def get_subset(subset_name, data_collection, app=None, save_to_disk=False):
     """
     Return a view of the anndata object that corresponds
     to the desired subset
@@ -86,7 +88,8 @@ def get_subset(subset_name, data_collection, save_to_disk=False):
                     new_filename = f'{orig_filename}_{subset_name.replace(" ","")}.h5ad'
                     newadata = goodsubset.copy(filename=new_filename) #This creates the file but leaves if open in the original mode
                     newadata.file.close() #So we close it
-                    goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
+                    goodsubset = app.load_data(new_filename)[0].Xdata #This adds the data to the data_collection and returns a reference to the first/main dataset
+                    #goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
                     print(f"Subset is being written to disk as {new_filename}")                
                 else:
                     print(f"Subset is defined as a slice of the full dataset at {orig_filename}. To save this subset as a new object to disk, re-run this command with save_to_disk=True")    
