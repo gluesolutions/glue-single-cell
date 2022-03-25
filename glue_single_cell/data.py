@@ -59,10 +59,12 @@ from glue.core.exceptions import IncompatibleAttribute
     
 from fast_histogram import histogram1d, histogram2d
 
+from glue.core import data_factories as df
+
 import anndata
 import scanpy
 
-def get_subset(subset_name, data_collection, save_to_disk=False):
+def get_subset(subset_name, data_collection, app=None, save_to_disk=False):
     """
     Return a view of the anndata object that corresponds
     to the desired subset
@@ -86,7 +88,14 @@ def get_subset(subset_name, data_collection, save_to_disk=False):
                     new_filename = f'{orig_filename}_{subset_name.replace(" ","")}.h5ad'
                     newadata = goodsubset.copy(filename=new_filename) #This creates the file but leaves if open in the original mode
                     newadata.file.close() #So we close it
-                    goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
+                    goodsubset = app.load_data(new_filename)[0].Xdata #This adds the data to the data_collection and returns a reference to the first/main dataset
+                    #The problem with this approach is that we keep adding new data
+                    #to the data collection every time we update the subset and call
+                    #this function again. We could... delete from the data object and force a reload?
+                    #What does this look like in the case were we do not save to disk?
+                    
+                    
+                    #goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
                     print(f"Subset is being written to disk as {new_filename}")                
                 else:
                     print(f"Subset is defined as a slice of the full dataset at {orig_filename}. To save this subset as a new object to disk, re-run this command with save_to_disk=True")    
@@ -329,3 +338,35 @@ class DataAnnData(Data):
                 x,y,w=find(chunk)
                 chunked_histogram += np.histogram2d(x+start, y, bins=bins, range=range, weights = w)[0]
             return chunked_histogram
+
+# Defining something like this would allow us to get the Xdata object from our DataAnnData object
+# more transparently
+# @data_translator(anndata.AnnData)
+# class GeoPandasTranslator:
+#  
+#     def to_data(self, data):
+#         return GeoRegionData(data)
+#  
+#     def to_object(self, data_or_subset, attribute=None):
+#         gdf = geopandas.GeoDataFrame()
+#         coords = data_or_subset.coordinate_components
+#         if isinstance(data_or_subset, Subset):
+#             #geom = data_or_subset.data.geometry
+#             centroids = data_or_subset.data._centroid_component_ids #because these are sort of fake coords
+#             crs = data_or_subset.data.meta['crs']
+#         else:
+#             #geom = data_or_subset.geometry
+#             centroids = data_or_subset._centroid_component_ids #because these are sort of fake coords
+#             crs = data_or_subset.meta['crs']
+#             
+#         #gdf.geometry = geom
+#         for cid in data_or_subset.components:
+#             if (cid not in coords) and (cid not in centroids):
+#                 if cid.label == 'geometry':
+#                     g = geopandas.GeoSeries.from_wkt(data_or_subset[cid])
+#                     gdf[cid.label] = g
+#                 else:
+#                     gdf[cid.label] = data_or_subset[cid]
+#         gdf.set_geometry("geometry",inplace=True)
+#         gdf.crs = crs
+#         return gdf
