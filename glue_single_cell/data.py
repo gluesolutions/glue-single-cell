@@ -60,6 +60,15 @@ from glue.core.exceptions import IncompatibleAttribute
 from fast_histogram import histogram1d, histogram2d
 
 from glue.core import data_factories as df
+from glue.core import Hub, HubListener
+
+from glue.core.message import (DataMessage,
+                                DataCollectionMessage,
+                                SubsetMessage,
+                                SubsetCreateMessage,
+                                SubsetUpdateMessage,
+                                SubsetDeleteMessage,
+                               )
 
 import anndata
 import scanpy
@@ -126,6 +135,62 @@ def get_subset_mask(subset_name, data_collection):
             pass
 
 
+class SubsetListener(HubListener):
+    """
+    A Listener to keep the X array of a DataAnnData
+    object updated with the current glue subset
+    definitions
+    
+    SubsetMessage define `subset` and `attribute` (for update?) 
+    """
+    def __init__(self, hub, anndata):
+        self.anndata = anndata
+        self.Xdata = anndata.Xdata
+        hub.subscribe(self, SubsetCreateMessage,
+                      handler=self.update_subset)
+        hub.subscribe(self, SubsetUpdateMessage,
+                      handler=self.update_subset)
+        hub.subscribe(self, SubsetDeleteMessage,
+                      handler=self.delete_subset)
+
+    def update_subset(self, message):
+        """
+        The trick here is that we want to 
+        react to subsets on the obs and var arrays
+        """
+        
+        subset = message.subset
+        if subset.data == self.anndata.meta['obs_data']:
+            try:
+                obs_mask = subset.to_mask()
+                self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
+            except IncompatibleAttribute:
+                pass
+        elif subset.data == self.anndata.meta['var_data']:
+            try:
+                var_mask = subset.to_mask()
+                self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
+            except IncompatibleAttribute:
+                pass
+
+    def delete_subset(self, message):
+        if subset.data == self.anndata.meta['obs_data']:
+            try:
+                self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
+            except:
+                pass
+        elif subset.data == self.anndata.meta['var_data']:
+            try:
+                self.Xdata.var.drop(subset.label,axis=1,inplace=True)
+            except:
+                pass
+
+
+    def receive_message(self, message):
+        print("Message received:")
+        print("{0}".format(message))
+
+
 class DataAnnData(Data):
     
     def __init__(self, data, label="", coords=None, **kwargs):
@@ -180,7 +245,25 @@ class DataAnnData(Data):
         # the data, we make sure that all Data objects have a UUID that can
         # uniquely identify them.
         self.uuid = str(uuid.uuid4())
-              
+        
+        #When we create this data object, we don't have a hub set up yet,
+        #so we can't init the Listener at Data creation time. But when?
+        #As soon as it is added to the data collection, in theory
+        
+        #Alternatively, we could only call these functions when we do the DGE plug-in
+        #But fundamentally we DO want to keep this thing in sync with the subset states
+        
+        #We could a listener to the Data Collection object (as a custom startup_action?)
+        #That would listen for a DataAnnData object to be added and then add these listeners
+        #To DataAnnData objects. That is... round about, but would work.
+        
+        #self.subset_listener = SubsetListener(self.hub, self)
+        
+    def attach_subset_listener(self):
+        if self.hub is not None:
+            self.subset_listener = SubsetListener(self.hub, self)
+        
+        
     @property
     def label(self):
         return self._label

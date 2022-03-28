@@ -1,14 +1,18 @@
 from glue.config import data_factory
+from glue.config import startup_action
+
 from glue.core import Data
 from pathlib import Path
 
 from glue.core import DataCollection
+from glue.core.message import DataCollectionAddMessage
+from glue.core import Hub, HubListener
 
 from .data import DataAnnData
 import anndata
 import scanpy as sc
 
-__all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata']
+__all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', 'DataAnnDataListener', 'setup_anndata']
 
 
 def df_to_data(obj,label=None):
@@ -64,10 +68,10 @@ def read_anndata(file_name):
     """
     list_of_data_objs = []
     basename = Path(file_name).stem
-    adata = sc.read(file_name, sparse=True)#, backed='r')
+    adata = sc.read(file_name, sparse=True, backed='r')
     
     # Get the X array as a special glue Data object
-    XData = DataAnnData(adata, label=f'{basename}_X')
+    XData = DataAnnData(adata, label=f'{basename}_X')#, filemode='r+')
     XData.meta['orig_filename'] = basename
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
@@ -87,7 +91,7 @@ def read_anndata(file_name):
         var_data.meta['anndatatype'] = 'var Array'
         var_data.meta['join_on_obs'] = False
         var_data.meta['join_on_var'] = True
-    
+        XData.meta['var_data'] = var_data 
         list_of_data_objs.append(var_data)
     except:
         pass
@@ -101,7 +105,7 @@ def read_anndata(file_name):
         obs_data.meta['anndatatype'] = 'obs Array'
         obs_data.meta['join_on_obs'] = True
         obs_data.meta['join_on_var'] = False
-    
+        XData.meta['obs_data'] = obs_data
         list_of_data_objs.append(obs_data)
     except:
         pass
@@ -129,3 +133,25 @@ def read_anndata(file_name):
     
     join_anndata_on_keys(list_of_data_objs)
     return list_of_data_objs
+    
+    
+class DataAnnDataListener(HubListener):
+    """
+    Listen for DataAnnData objects to be added to the 
+    data collection object, and, if one is, attach its
+    subset listener
+    """
+    def __init__(self, hub):
+        hub.subscribe(self, DataCollectionAddMessage,
+                      handler=self.attach_subset_listener)
+    
+    def attach_subset_listener(self, message):
+        data = message.data
+        if isinstance(data, DataAnnData):
+            data.attach_subset_listener()
+            
+
+@startup_action("setup_anndata")
+def setup_anndata(session, data_collection):
+    data_collection.anndatalistener = DataAnnDataListener(data_collection.hub)
+    return
