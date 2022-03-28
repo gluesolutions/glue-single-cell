@@ -68,7 +68,7 @@ def read_anndata(file_name):
     """
     list_of_data_objs = []
     basename = Path(file_name).stem
-    adata = sc.read(file_name, sparse=True, backed='r')
+    adata = sc.read(file_name, sparse=True)#, backed='r')
     
     # Get the X array as a special glue Data object
     XData = DataAnnData(adata, label=f'{basename}_X')#, filemode='r+')
