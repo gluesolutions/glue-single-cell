@@ -48,14 +48,6 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         https://github.com/theislab/scanpy/issues/2147
         
         (the above is technically for a different scanpy function, but the same problem occurs for rank_genes_groups)
-        
-        Just getting this error still
-        File "/Users/jfoster/opt/anaconda3/envs/single-cell/lib/python3.9/site-packages/glue/core/subset.py", line 182, in to_mask
-            return self.data.get_mask(self.subset_state, view=view)
-          File "/Users/jfoster/opt/anaconda3/envs/single-cell/lib/python3.9/site-packages/glue/core/data.py", line 1387, in get_mask
-            return get_mask_with_key_joins(self, self._key_joins, subset_state, view=view)
-          File "/Users/jfoster/opt/anaconda3/envs/single-cell/lib/python3.9/site-packages/glue/core/joins.py", line 105, in get_mask_with_key_joins
-            raise IncompatibleAttribute
         """
         for subset in self.state.subset1.subsets:
             if subset.data == self.state.data:
@@ -79,11 +71,14 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         
         adata.obs['glue_subsets'] = np.select(conditions, choices, default='0')
          #This could be not well-defined -- but we need both masks in one var -- code mask1 as '1' and mask2 = '2' and everything else as '0'
-                
-        sc.tl.rank_genes_groups(adata, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
+        
+        adata_selected = adata[adata.obs['glue_subsets'] != 0, :]
+        adata_selected = adata_selected.to_memory()  # We should check that this is not going to be too large
+
+        sc.tl.rank_genes_groups(adata_selected, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
         
         n_genes = 25 #This should be a user-specified input
-        gene_list = [x[0] for x in adata.uns['rank_genes_groups']['names']][0:n_genes]
+        gene_list = [x[0] for x in adata_selected.uns['rank_genes_groups']['names']][0:n_genes]
 
         print(gene_list)
         state_list = []
