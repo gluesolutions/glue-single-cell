@@ -187,8 +187,9 @@ class SubsetListener(HubListener):
 
 
     def receive_message(self, message):
-        print("Message received:")
-        print("{0}".format(message))
+        pass
+        #print("Message received:")
+        #print("{0}".format(message))
 
 
 class DataAnnData(Data):
@@ -246,19 +247,12 @@ class DataAnnData(Data):
         # uniquely identify them.
         self.uuid = str(uuid.uuid4())
         
-        #When we create this data object, we don't have a hub set up yet,
-        #so we can't init the Listener at Data creation time. But when?
-        #As soon as it is added to the data collection, in theory
-        
-        #Alternatively, we could only call these functions when we do the DGE plug-in
-        #But fundamentally we DO want to keep this thing in sync with the subset states
-        
-        #We could a listener to the Data Collection object (as a custom startup_action?)
-        #That would listen for a DataAnnData object to be added and then add these listeners
-        #To DataAnnData objects. That is... round about, but would work.
-        
-        #self.subset_listener = SubsetListener(self.hub, self)
-        
+        # When we create this data object, we don't have a hub set up yet,
+        # so we can't init the Listener at Data creation time. Instead,
+        # we add a Listener to the DataCollection object in a custom
+        # startup_action, and this adds a subset_listener to DataAnnData
+        # objects that are added to the data collection.
+                
     def attach_subset_listener(self):
         if self.hub is not None:
             self.subset_listener = SubsetListener(self.hub, self)

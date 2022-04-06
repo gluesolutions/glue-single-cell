@@ -139,7 +139,7 @@ class DataAnnDataListener(HubListener):
     """
     Listen for DataAnnData objects to be added to the 
     data collection object, and, if one is, attach its
-    subset listener
+    subset listener.
     """
     def __init__(self, hub):
         hub.subscribe(self, DataCollectionAddMessage,

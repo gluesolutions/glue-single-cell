@@ -42,8 +42,8 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         This assumes that these subsets have been defined properly on the 
         obs array
         
-        Note that this DOES NOT WORK if we want to open anndata in disk-backed
-        mode:
+        Note that this copies the relevant subsets into memory as otherwise
+        this won't work on an anndata gile in disk-backed mode:
         
         https://github.com/theislab/scanpy/issues/2147
         
