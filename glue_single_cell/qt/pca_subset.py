@@ -32,7 +32,7 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Means':
         print("Starting mean calculation...")
-        data_arr = np.expand_dims(np.sum(adata_sel.X,axis=1),axis=1)  # Expand to make same dimensionality as PCA
+        data_arr = np.expand_dims(adata_sel.X.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
         print("Mean calculation finished")
     return data_arr
 
