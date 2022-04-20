@@ -1,5 +1,5 @@
 from glue.core.state_objects import State
-from echo import SelectionCallbackProperty
+from echo import SelectionCallbackProperty, CallbackProperty
 from glue.core.data_combo_helper import DataCollectionComboHelper, ComponentIDComboHelper, ComboHelper
 
 __all__ = ['DiffGeneExpState', 'PCASubsetState']
@@ -53,6 +53,8 @@ class PCASubsetState(State):
     
     data = SelectionCallbackProperty()
     genesubset = SelectionCallbackProperty()
+    do_means = CallbackProperty(True)
+    do_pca = CallbackProperty(False)
     
     def __init__(self, data_collection):
         super(PCASubsetState, self).__init__()

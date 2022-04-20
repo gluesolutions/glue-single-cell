@@ -10,7 +10,7 @@ def diff_gene_exp_plugin(session, data_collection):
                                     default=None, parent=None)
     return
 
-@menubar_plugin("Calculate PCA for Gene Subset")
+@menubar_plugin("Calculate Summary Over Gene Subset")
 def pca_subset_exp_plugin(session, data_collection):
     PCASubsetDialog.summarize(data_collection,
                                     default=None, parent=None)

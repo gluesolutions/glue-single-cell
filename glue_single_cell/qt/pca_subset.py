@@ -23,7 +23,7 @@ __all__ = ['PCASubsetDialog','GeneSummaryListener']
 def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
     """
     """
-    print("Getting mask...")
+    #print("Getting mask...")
     mask = genesubset.to_mask()
     adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
     if calculation == 'PCA':
@@ -31,9 +31,9 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         sc.pp.pca(adata_sel, n_comps=10)
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Means':
-        print("Starting mean calculation...")
+        #print("Starting mean calculation...")
         data_arr = np.expand_dims(adata_sel.X.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
-        print("Mean calculation finished")
+        #print("Mean calculation finished")
     return data_arr
 
 class GeneSummaryListener(HubListener):
@@ -85,8 +85,9 @@ class GeneSummaryListener(HubListener):
         pass
         
     def receive_message(self, message):
-        print("Message received:")
-        print("{0}".format(message))
+        pass
+        #print("Message received:")
+        #print("{0}".format(message))
 
 class PCASubsetDialog(QtWidgets.QDialog):
 
@@ -110,16 +111,16 @@ class PCASubsetDialog(QtWidgets.QDialog):
 
     def _apply(self):
         """
-        1. Take subset of anndata object (load into memory?)
-        2. Run scanpy on this subset
+        1. Take a gene subset of anndata object (load into memory?)
+        2. Calculate some summary statistic on this subset of genes
         3. Store these values into the data somehow.
             a. If we put them into the existing AnnData object we will overwrite any existing PCAs
             b. We could return a new data object linked to the other data
             c. But the desire is to color-code e.g. a UMAP figure by these new values, which requires appending new attributes
-               to the target dataset.
+               to the target dataset, so this is what we do.
         
         In order to be able to make changes to the subset on-the-fly we need two things:
-        1) This plug-in should establish a listener for the a specific subset and attribute
+        1) This plug-in establishs a listener for a specific subset and attribute
         2) We might need to make the calculation faster
 
         """
@@ -141,7 +142,10 @@ class PCASubsetDialog(QtWidgets.QDialog):
         adata = Xdata.Xdata
         basename = genesubset.label
         
-        key = 'Means'
+        if self.state.do_means:
+            key = 'Means'
+        elif self.state.do_pca:
+            key = 'PCA'
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
         data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
         #data.join_on_key(target_dataset,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
