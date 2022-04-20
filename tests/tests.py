@@ -25,11 +25,12 @@ def data_sparse_backed():
     C[C<0.90] = 0
     C = csc_matrix(C)
     new_adata = anndata.AnnData(X=C,dtype='float64')
-    new_adata.write(filename='tests/test_data/test_dataset_float64.h5ad')
-    adata = anndata.read_h5ad(os.path.join(BASE_DIR,'tests/test_data/test_dataset_float64.h5ad'),backed='r')
+    file_location = os.path.join(BASE_DIR,'tests/test_data/test_dataset_float64.h5ad')
+    new_adata.write(filename=file_location)
+    adata = anndata.read_h5ad(file_location,backed='r')
     d = DataAnnData(adata,label="test_name")
     yield C,d
-    os.remove('tests/test_data/test_dataset_float64.h5ad')
+    os.remove(file_location)
 
 def test_get_data_view_sparse_backed(data_sparse_backed):
     C,d = data_sparse_backed
