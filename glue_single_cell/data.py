@@ -14,15 +14,14 @@ AnnData objects include many things of different dimensions.
 This DataAnnData class only exposes the X matrix of
 raw data values with dimension num_obs x num_vars as a glue
 component. The other parts of the AnnData object are
-stores as regular glue data objects -- their creation and
+stored as regular glue data objects -- their creation and
 linking with the DataAnnData is handled by the data loader.
 
-*EACH* obsm is a different glue dataset
-*EACH* varm is a different glue dataset
-But var, obs, obsp, and varp can all be single glue datasets
+All the obsm arrays and obs table are combined as one dataset
+All the varm arrays and var table are combined as one dataset
 
-However, the obsp and varp could be extremely large. We do
-not deal with these yet.
+The obsp and varp arrays could be extremely large and require
+a dedicated data class. We do not deal with these yet.
 
 Because of automatic sanitization 
 (see __[this issue](https://github.com/theislab/scanpy/issues/1747)__)

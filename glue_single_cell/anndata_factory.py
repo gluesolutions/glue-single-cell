@@ -38,21 +38,15 @@ def join_anndata_on_keys(datasets):
     for dataset in datasets:
         if dataset.meta['anndatatype'] == 'X Array':
             pass
-            #for d in varset:
-            #    if d.meta['anndatatype'] != 'X Array': #Do not join to self
-            #        dataset.join_on_key(d,'Pixel Axis 0 [y]','Pixel Axis 0 [x]')
-            #for d in obsset:
-            #    if d.meta['anndatatype'] != 'X Array': #Do not join to self
-            #        dataset.join_on_key(d,'Pixel Axis 1 [x]','Pixel Axis 0 [x]')
-        elif dataset.meta['anndatatype'] == 'obsm Array':
+        elif dataset.meta['anndatatype'] == 'obs Array':
             for d in obsset:
                 #Do not join to self or X Array again
-                if (d.meta['anndatatype'] != 'X Array') and (d.meta['anndatatype'] != 'obsm Array'):
+                if (d.meta['anndatatype'] != 'X Array') and (d.meta['anndatatype'] != 'obs Array'):
                     dataset.join_on_key(d,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
-        elif dataset.meta['anndatatype'] == 'varm Array':
+        elif dataset.meta['anndatatype'] == 'var Array':
             for d in varset:
                 #Do not join to self or X Array again
-                if (d.meta['anndatatype'] != 'X Array') and (d.meta['anndatatype'] != 'varm Array'):
+                if (d.meta['anndatatype'] != 'X Array') and (d.meta['anndatatype'] != 'var Array'):
                     dataset.join_on_key(d,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
     return datasets
 
@@ -78,7 +72,6 @@ def read_anndata(file_name):
     XData.meta['join_on_obs'] = True
     XData.meta['join_on_var'] = True
     
-    
     list_of_data_objs.append(XData)
     
     # The var array is all components of the same length
@@ -95,8 +88,16 @@ def read_anndata(file_name):
         list_of_data_objs.append(var_data)
     except:
         pass
-        
+    
+    for key in adata.varm_keys():
+        data_arr = adata.varm[key]
+        data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+        for comp_name, comp in data_to_add.items():
+            var_data.add_component(comp,comp_name)
+    
+    
     # The obs array is all components of the same length
+    # and is stored by AnnData as a Pandas DataFrame
     try:
         obs = adata.obs
         obs_data = df_to_data(obs,label=f'{basename}_obs')
@@ -111,25 +112,11 @@ def read_anndata(file_name):
         pass
     
     for key in adata.obsm_keys():
-        
         data_arr = adata.obsm[key]
-        data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
-        data.meta['Xdata'] = XData.uuid
-        data.meta['anndatatype'] = 'obsm Array'
-        data.meta['join_on_obs'] = True
-        data.meta['join_on_var'] = False
+        data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+        for comp_name, comp in data_to_add.items():
+            obs_data.add_component(comp,comp_name)
     
-        list_of_data_objs.append(data)
-    
-    for key in adata.varm_keys():
-            
-        data_arr = adata.varm[key]
-        data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
-        data.meta['Xdata'] = XData.uuid
-        data.meta['anndatatype'] = 'varm Array'
-        data.meta['join_on_var'] = True
-        data.meta['join_on_obs'] = False
-        list_of_data_objs.append(data)
     
     join_anndata_on_keys(list_of_data_objs)
     return list_of_data_objs
