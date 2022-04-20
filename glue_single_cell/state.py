@@ -1,6 +1,6 @@
 from glue.core.state_objects import State
 from echo import SelectionCallbackProperty, CallbackProperty
-from glue.core.data_combo_helper import DataCollectionComboHelper, ComponentIDComboHelper, ComboHelper
+from glue.core.data_combo_helper import DataCollectionComboHelper, ComponentIDComboHelper, ComboHelper, ManualDataComboHelper
 
 __all__ = ['DiffGeneExpState', 'PCASubsetState']
 
@@ -59,8 +59,13 @@ class PCASubsetState(State):
     def __init__(self, data_collection):
         super(PCASubsetState, self).__init__()
         self.data_collection = data_collection
-        self.data_helper = DataCollectionComboHelper(self, 'data', data_collection)  # This should only allow cell-like datasets
+        self.data_helper = ManualDataComboHelper(self, 'data', data_collection)  # This should only allow cell-like datasets
         self.genesubset_helper = ComboHelper(self, 'genesubset')  # This should only allow subsets that are defined over genes...
+
+        for data in self.data_collection:
+            if data.meta['anndatatype'] == 'obs Array':
+                self.data_helper.append_data(data)
+
 
         def display_func_label(subset_group):
             return subset_group.label
