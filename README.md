@@ -29,6 +29,12 @@ The Scanpy differential gene expression plugin requires some custom actions to r
 
 `glue -v --startup=setup_anndata`
 
+## Data Structure
+
+This plug-in maps the [AnnData schema](https://anndata.readthedocs.io/en/latest/) for storing single-cell data into linked [glue Data objects](http://docs.glueviz.org/en/stable/python_guide/data_tutorial.html) as follows:
+
+![DataStructureSchematic](https://user-images.githubusercontent.com/3639698/164315869-935163b1-2503-4e12-8166-3978da8dbe0c.png)
+
 ## Example Doing Scanpy differential gene expression on glue user-defined subsets.
 ![Differential-Gene-Expression-Overview-Ann](https://user-images.githubusercontent.com/3639698/160698692-258365f1-e9f1-488b-9b92-24b1a0429c47.png)
 
