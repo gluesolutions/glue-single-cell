@@ -12,8 +12,11 @@ Contents:
 If installing into a new virtual environment:
 
 `conda create -n single-cell python=3.9`
+
 `conda activate single-cell`
+
 `conda install -c glueviz glueviz`
+
 `pip install git+https://github.com/gluesolutions/glue-single-cell.git`
 
 Otherwise, the (non-glue) requirements for this package are just `scanpy` and `anndata` so in an environment already running glue the following is all that is required:
