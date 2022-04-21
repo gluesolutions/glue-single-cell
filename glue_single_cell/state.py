@@ -63,7 +63,7 @@ class PCASubsetState(State):
         self.genesubset_helper = ComboHelper(self, 'genesubset')  # This should only allow subsets that are defined over genes...
 
         for data in self.data_collection:
-            if data.meta['anndatatype'] == 'obs Array':
+            if data.meta.get('anndatatype') == 'obs Array':
                 self.data_helper.append_data(data)
 
 
