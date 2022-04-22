@@ -53,8 +53,9 @@ class PCASubsetState(State):
     
     data = SelectionCallbackProperty()
     genesubset = SelectionCallbackProperty()
-    do_means = CallbackProperty(True)
+    do_means = CallbackProperty(False)
     do_pca = CallbackProperty(False)
+    do_module = CallbackProperty(True)
     
     def __init__(self, data_collection):
         super(PCASubsetState, self).__init__()

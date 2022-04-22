@@ -70,6 +70,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QRadioButton" name="bool_do_module">
+       <property name="text">
+        <string>Module Score</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QRadioButton" name="bool_do_means">
        <property name="text">
         <string>Mean Value</string>

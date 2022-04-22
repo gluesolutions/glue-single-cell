@@ -30,6 +30,11 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         adata_sel = adata_sel.to_memory()
         sc.pp.pca(adata_sel, n_comps=10)
         data_arr = adata_sel.obsm['X_pca']
+    elif calculation == 'Module':
+        adata_sel = adata.to_memory()
+        gene_list = adata_sel.var_names[mask]
+        sc.tl.score_genes(adata_sel, gene_list = gene_list)
+        data_arr = np.expand_dims(adata_sel.obs['score'],axis=1)
     elif calculation == 'Means':
         #print("Starting mean calculation...")
         data_arr = np.expand_dims(adata_sel.X.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
@@ -46,7 +51,7 @@ class GeneSummaryListener(HubListener):
     def __init__(self, hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata):
         self.target_dataset = target_dataset
         self.genesubset = genesubset
-        self.genesubset_attributes = genesubset_attributes  #We want this to remain fixed
+        #self.genesubset_attributes = genesubset_attributes  #We want this to remain fixed
         self.basename = basename
         self.key = key
         self.adata = adata
@@ -65,18 +70,18 @@ class GeneSummaryListener(HubListener):
         """
         subset = message.subset
         if subset == self.genesubset:
-            if subset.attributes == self.genesubset_attributes:
-                new_data = do_calculation_over_gene_subset(self.adata, self.genesubset, calculation = self.key)
-                mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
-                for x in self.target_dataset.components:  # This is to get the right component ids
-                    xstr = f'{x.label}'
-                    #print(xstr)
-                    if xstr in mapping.keys():
-                        mapping[x] = mapping.pop(xstr)
-                        #del mapping[x.label]
-                #print(mapping)
-                #print([type(k) for k in mapping.keys()])
-                self.target_dataset.update_components(mapping)
+            #if subset.attributes == self.genesubset_attributes:
+            new_data = do_calculation_over_gene_subset(self.adata, self.genesubset, calculation = self.key)
+            mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
+            for x in self.target_dataset.components:  # This is to get the right component ids
+                xstr = f'{x.label}'
+                #print(xstr)
+                if xstr in mapping.keys():
+                    mapping[x] = mapping.pop(xstr)
+                    #del mapping[x.label]
+            #print(mapping)
+            #print([type(k) for k in mapping.keys()])
+            self.target_dataset.update_components(mapping)
     
     def delete_subset(self, message):
         """
@@ -146,6 +151,8 @@ class PCASubsetDialog(QtWidgets.QDialog):
             key = 'Means'
         elif self.state.do_pca:
             key = 'PCA'
+        elif self.state.do_module:
+            key = "Module"
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
         data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
         #data.join_on_key(target_dataset,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
