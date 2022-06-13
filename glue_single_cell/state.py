@@ -21,7 +21,7 @@ class GSEApyState(State):
         self.data_collection = data_collection
         self.data_helper = DataCollectionComboHelper(self, 'data', data_collection)
         self.subset_helper = ComboHelper(self, 'subset')
-        self.gene_set_helper = ComboHelper(self, 'subset')
+        self.gene_set_helper = ComboHelper(self, 'gene_set')
 
         self.gene_att_helper = ComponentIDComboHelper(self, 'gene_att',
                                                       categorical=True)
@@ -41,12 +41,16 @@ class GSEApyState(State):
         self.subset_helper.display = display_func_label
         
         
-        self.gene_set_helper.choices = ['KEGG_2016','KEGG_2019_Human','KEGG_2019_Mouse','KEGG_2021_Human']
-        self.gene_set_helper.selection = ['KEGG_2019_Mouse']
+        def display_kegg_name(pathway):
+            return str(pathway)
+
         
+        self.gene_set_helper.choices = ['KEGG_2016','KEGG_2019_Human','KEGG_2019_Mouse','KEGG_2021_Human']
+        self.gene_set_helper.selection = self.gene_set_helper.choices[0]
+        self.gene_set_helper.display = display_kegg_name
 
     def _on_data_change(self, *args, **kwargs):
-        self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data.meta['var_data']])
+        self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data])
 
 
 class DiffGeneExpState(State):

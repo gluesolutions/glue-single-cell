@@ -1,7 +1,7 @@
 import os
 from qtpy import QtWidgets
 from echo.qt import autoconnect_callbacks_to_qt
-import pandas ad pd
+import pandas as pd
 
 from glue.utils.qt import load_ui
 
@@ -40,9 +40,10 @@ class GSEApyDialog(QtWidgets.QDialog):
     def _apply(self):
         """
         """
-        for subset in self.state.subset.subsets:
-            if subset.data == self.state.data:
-                gene_subset = subset
+        if self.state.subset is not None:
+            for subset in self.state.subset.subsets:
+                if subset.data == self.state.data:
+                    gene_subset = subset
         
         gene_list = self.state.data[self.state.gene_att] # This ignores subset for now and the need to uppercase them all
         gene_list_upper = [x.upper() for x in gene_list]
@@ -54,6 +55,7 @@ class GSEApyDialog(QtWidgets.QDialog):
         full_list.set_index('Genes',inplace=True)
         full_term = full_list['Term'].str.get_dummies() # Expand pathways back to columns
         gene_pathways = full_term.groupby('Genes').sum() # Sum over genes associated with each expression. This is now binary
+        gene_pathways.reset_index(inplace=True)
         self._collect['gene_pathways'] =  gene_pathways
         self._collect['gene_pathways'].join_on_key(self.state.data,'Genes',self.state.gene_att)
         
