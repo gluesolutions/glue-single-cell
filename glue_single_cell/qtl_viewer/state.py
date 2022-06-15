@@ -1,5 +1,6 @@
 from glue.viewers.matplotlib.state import (
-   DeferredDrawSelectionCallbackProperty as DDSCProperty)
+    DeferredDrawCallbackProperty as DDCProperty,
+    DeferredDrawSelectionCallbackProperty as DDSCProperty)
 from glue.core.data_combo_helper import ComponentIDComboHelper
 
 from glue.viewers.scatter.state import ScatterViewerState
@@ -9,7 +10,7 @@ __all__ = ['QTLViewerState']
 class QTLViewerState(ScatterViewerState):
     
     lod_att = DDSCProperty(docstring='The attribute giving the LOD score ', default_index=2)
-    lod_thresh = DDSCProperty(1, docstring='The LOD threshold for display and subsets')
+    lod_thresh = DDCProperty(0, docstring='The LOD threshold for display and subsets')
     
     def __init__(self, **kwargs):
     

@@ -7,6 +7,19 @@ from glue.core.exceptions import IncompatibleAttribute
 import numpy as np
 
 
+CMAP_PROPERTIES = set(['cmap_mode', 'cmap_att', 'cmap_vmin', 'cmap_vmax', 'cmap'])
+MARKER_PROPERTIES = set(['size_mode', 'size_att', 'size_vmin', 'size_vmax', 'size_scaling', 'size', 'fill'])
+LINE_PROPERTIES = set(['linewidth', 'linestyle'])
+DENSITY_PROPERTIES = set(['dpi', 'stretch', 'density_contrast'])
+VISUAL_PROPERTIES = (CMAP_PROPERTIES | MARKER_PROPERTIES | DENSITY_PROPERTIES |
+                     LINE_PROPERTIES | set(['color', 'alpha', 'zorder', 'visible']))
+
+DATA_PROPERTIES = set(['layer', 'x_att', 'y_att', 'lod_att', 'lod_thresh', 'cmap_mode', 'size_mode', 'density_map',
+                       'xerr_att', 'yerr_att', 'xerr_visible', 'yerr_visible',
+                       'vector_visible', 'vx_att', 'vy_att', 'vector_arrowhead', 'vector_mode',
+                       'vector_origin', 'line_visible', 'markers_visible', 'vector_scaling'])
+
+
 class DensityMapLimits(object):
 
     contrast = 1
@@ -49,9 +62,27 @@ class QTLLayerArtist(ScatterLayerArtist):
         self._errorbar_keep = None
 
     @defer_draw
+    def _update_scatter(self, force=False, **kwargs):
+    
+        if (self._viewer_state.x_att is None or
+            self._viewer_state.y_att is None or
+                self.state.layer is None):
+            return
+    
+        changed = set() if force else self.pop_changed_properties()
+    
+        if force or len(changed & DATA_PROPERTIES) > 0:
+            self._update_data()
+            force = True
+    
+        if force or len(changed & VISUAL_PROPERTIES) > 0:
+            self._update_visual_attributes(changed, force=force)
+
+
+    @defer_draw
     def _update_data(self):
     
-        print(f"{self._viewer_state.lod_att}")
+        #print(f"{self._viewer_state.lod_att}")
         # Layer artist has been cleared already
         if len(self.mpl_artists) == 0:
             return
@@ -78,6 +109,7 @@ class QTLLayerArtist(ScatterLayerArtist):
             self.enable()
         
         if self._viewer_state.lod_att is not None and self._viewer_state.lod_thresh is not None:
+            #print("Applying lod thresholding...")
             try:
                 if not self.state.density_map:
                     lod = ensure_numerical(self.layer[self._viewer_state.lod_att].ravel())
