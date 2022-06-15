@@ -2,7 +2,55 @@ from glue.core.state_objects import State
 from echo import SelectionCallbackProperty, CallbackProperty
 from glue.core.data_combo_helper import DataCollectionComboHelper, ComponentIDComboHelper, ComboHelper, ManualDataComboHelper
 
-__all__ = ['DiffGeneExpState', 'PCASubsetState']
+__all__ = ['DiffGeneExpState', 'PCASubsetState', 'GSEApyState']
+
+
+class GSEApyState(State):
+    data = SelectionCallbackProperty() # The data object to enrich
+    subset = SelectionCallbackProperty() # Optionally a subset that can be applied to data
+    #organism = SelectionCallbackProperty()
+    gene_set = SelectionCallbackProperty() # The Enrichr library to use. Could be linked to organism to get a filtered list.
+    # This is a terrible name, because it is confusing with gene subsets, but this is the GSEApy parameter name
+    gene_att = SelectionCallbackProperty() # The attribute with gene labels in it
+
+    
+    def __init__(self, data_collection):
+        
+        super(GSEApyState, self).__init__()
+
+        self.data_collection = data_collection
+        self.data_helper = DataCollectionComboHelper(self, 'data', data_collection)
+        self.subset_helper = ComboHelper(self, 'subset')
+        self.gene_set_helper = ComboHelper(self, 'gene_set')
+
+        self.gene_att_helper = ComponentIDComboHelper(self, 'gene_att',
+                                                      categorical=True)
+
+        def display_func_label(subset_group):
+            return subset_group.label
+        
+        self.add_callback('data', self._on_data_change)
+        self._on_data_change()
+        
+        
+        self.subset_helper.choices = data_collection.subset_groups
+        try:
+            self.subset_helper.selection = data_collection.subset_groups[0]
+        except IndexError:
+            pass
+        self.subset_helper.display = display_func_label
+        
+        
+        def display_kegg_name(pathway):
+            return str(pathway)
+
+        
+        self.gene_set_helper.choices = ['KEGG_2016','KEGG_2019_Human','KEGG_2019_Mouse','KEGG_2021_Human']
+        self.gene_set_helper.selection = self.gene_set_helper.choices[0]
+        self.gene_set_helper.display = display_kegg_name
+
+    def _on_data_change(self, *args, **kwargs):
+        self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data])
 
 
 class DiffGeneExpState(State):

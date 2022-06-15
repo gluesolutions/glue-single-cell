@@ -17,6 +17,8 @@ from ..anndata_factory import df_to_data
 
 import scanpy as sc
 
+import time
+
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
@@ -31,9 +33,15 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         sc.pp.pca(adata_sel, n_comps=10)
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
+        before_memory = time.perf_counter()
         adata_sel = adata.to_memory()
+        after_memory = time.perf_counter()
+        print(f"Loaded adata into memory in {after_memory - before_memory:0.2f} seconds", file=open('timing.txt','a'))
         gene_list = adata_sel.var_names[mask]
+        before_score = time.perf_counter()
         sc.tl.score_genes(adata_sel, gene_list = gene_list)
+        after_score = time.perf_counter()
+        print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
         data_arr = np.expand_dims(adata_sel.obs['score'],axis=1)
     elif calculation == 'Means':
         #print("Starting mean calculation...")
