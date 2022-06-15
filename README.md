@@ -4,8 +4,9 @@ Support for single cell data in glue.
 Contents:
 1. A data loader to import .h5ad or .loom files into glue as a set of linked glue Data Objects
 2. A custom wrapper for the X array in an AnnData file-type to allow a subset of out-of-memory operations 
-3. A sample menubar plugin to enable running Scanpy differential gene expression on glue user-defined subsets
-4. A sample menubar plugin to enable calculating summary statistics on cells based on a subset of genes
+3. A menubar plugin to enable running Scanpy differential gene expression on glue user-defined subsets
+4. A menubar plugin to enable calculating summary statistics on cells based on a subset of genes
+5. A menubar plugin to add KEGG pathways to a gene list
 
 # Installation
 
