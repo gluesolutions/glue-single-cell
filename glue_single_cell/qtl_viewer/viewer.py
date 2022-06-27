@@ -6,6 +6,11 @@ from glue.utils import defer_draw, decorate_all_methods
 from .layer_artist import QTLLayerArtist
 from .qt.options_widget import QTLOptionsWidget
 from .state import QTLViewerState
+from glue.core.subset import roi_to_subset_state, RangeSubsetState
+
+
+from glue.core.roi_pretransforms import ProjectionMplTransform #Probably not needed
+
 
 __all__ = ['QTLViewer']
 
@@ -23,3 +28,40 @@ class QTLViewer(ScatterViewer):
 
     def __init__(self, session, parent=None, state=None):
         super(QTLViewer, self).__init__(session, parent=parent, state=state)
+
+    def apply_roi(self, roi, override_mode=None):
+
+        # Force redraw to get rid of ROI. We do this because applying the
+        # subset state below might end up not having an effect on the viewer,
+        # for example there may not be any layers, or the active subset may not
+        # be one of the layers. So we just explicitly redraw here to make sure
+        # a redraw will happen after this method is called.
+        self.redraw()
+
+        if len(self.layers) == 0:
+            return
+
+        x_date = 'datetime' in self.state.x_kinds
+        y_date = 'datetime' in self.state.y_kinds
+
+        if x_date or y_date:
+            roi = roi.transformed(xfunc=mpl_to_datetime64 if x_date else None,
+                                  yfunc=mpl_to_datetime64 if y_date else None)
+
+        use_transform = self.state.plot_mode != 'rectilinear'
+        subset_state = roi_to_subset_state(roi,
+                                           x_att=self.state.x_att, x_categories=self.state.x_categories,
+                                           y_att=self.state.y_att, y_categories=self.state.y_categories,
+                                           use_pretransform=use_transform)
+        if use_transform:
+            subset_state.pretransform = ProjectionMplTransform(self.state.plot_mode,
+                                                               self.axes.get_xlim(),
+                                                               self.axes.get_ylim(),
+                                                               self.axes.get_xscale(),
+                                                               self.axes.get_yscale())
+
+        if self.state.lod_att is not None and self.state.lod_thresh is not None:
+            lod_roi = RangeSubsetState(self.state.lod_thresh, 999, att= self.state.lod_att) #hi=999 is a bad hack. We could set this to the max value of self.state.lod_att instead
+            subset_state = subset_state & lod_roi
+
+        self.apply_subset_state(subset_state, override_mode=override_mode)

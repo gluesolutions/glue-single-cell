@@ -34,6 +34,9 @@ class DensityMapLimits(object):
 class QTLLayerArtist(ScatterLayerArtist):
     """
     This is not going to work for a density artist
+    
+    Specifically, _update_data just filters the data list before
+    display, which does not work for the density map mode
     """
     
     _layer_state_cls = ScatterLayerState
