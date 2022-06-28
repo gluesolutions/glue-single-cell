@@ -28,6 +28,49 @@ class QTLViewer(ScatterViewer):
 
     def __init__(self, session, parent=None, state=None):
         super(QTLViewer, self).__init__(session, parent=parent, state=state)
+        self.state.add_callback('species',self._update_axes)
+        self.state.add_callback('pos_units',self._update_axes)
+
+
+    def _update_axes(self, *args):
+        
+        if (self.state.x_att is not None) and (self.state.y_att is not None):
+            
+            chr_bounds = [0]
+            chr_label_positions = []
+            chr_labels = []
+            
+            current_position = 0
+            
+            names = self.state.chr_pos[self.state.species]['Names']
+            gridsize = self.state.chr_pos[self.state.species]['GridSize']
+            for i in range(len(names)):
+                length = gridsize/self.state.pos_units
+                center_position = current_position+length/2
+                chr_label_positions.append(center_position)
+                current_position += length
+                chr_bounds.append(current_position)
+                chr_labels.append(names[i])
+            self.axes.set_xticks(chr_label_positions,minor=False)
+            self.axes.set_xticklabels(chr_labels,minor=False)
+            self.axes.set_xticks(chr_bounds,minor=True)
+            
+            self.axes.set_yticks(chr_label_positions,minor=False)
+            self.axes.set_yticklabels(chr_labels,minor=False)
+            self.axes.set_yticks(chr_bounds,minor=True)
+            
+            self.axes.tick_params(which='major', length=0)
+            self.axes.tick_params(which='minor', length=10)
+            
+            self.axes.grid(visible=True, which='minor')
+            
+            self.state.x_axislabel = 'Chr: ' + self.state.x_att.label
+
+            self.state.y_axislabel = 'Chr: ' + self.state.y_att.label
+
+                
+        self.axes.figure.canvas.draw_idle()
+
 
     def apply_roi(self, roi, override_mode=None):
 
