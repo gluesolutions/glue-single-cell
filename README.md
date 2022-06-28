@@ -7,6 +7,7 @@ Contents:
 3. A menubar plugin to enable running Scanpy differential gene expression on glue user-defined subsets
 4. A menubar plugin to enable calculating summary statistics on cells based on a subset of genes
 5. A menubar plugin to add KEGG pathways to a gene list
+6. A custom viewer for QTL data, including chromosome-labelling and filtering by LOD
 
 # Installation
 
