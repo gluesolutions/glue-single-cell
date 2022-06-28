@@ -28,15 +28,12 @@ class QTLViewerState(ScatterViewerState):
     species = DDSCProperty(0, docstring='The species for displaying chromosome boundaries')
     pos_units = DDSCProperty(0, docstring='Units for gene and marker position')
 
-    #chr_att = DDSCProperty(docstring='The attribute giving chromosome information')
     lod_att = DDSCProperty(docstring='The attribute giving the LOD score ', default_index=2)
     lod_thresh = DDCProperty(0, docstring='The LOD threshold for display and subsets')
     
     def __init__(self, **kwargs):
     
         super(QTLViewerState, self).__init__(**kwargs)
-        
-        #self.add_callback('layers', self._layers_changed)
 
         self.lod_att_helper = ComponentIDComboHelper(self, 'lod_att', numeric=True)
         self.species_helper = ComboHelper(self, 'species')
@@ -62,15 +59,6 @@ class QTLViewerState(ScatterViewerState):
             pass
         self.pos_units_helper.display = display_unit_names
 
-        #self.chr_att_helper = ComponentIDComboHelper(self, 'chr_att', categorical=True, numeric=False) # Might be a problem if no X/Y/MT 
-
-        #self.add_callback('lod_att', self._adjust_lod_thresh)
-
-        #self.limits_cache = {}
-        #                                            
-        #self.cmap_lim_helper = StateAttributeLimitsHelper(self, attribute='lod_att',
-        #                                                  lower='lod_vmin', upper='lod_vmax',
-        #                                                  limits_cache=self.limits_cache)
         self.chr_pos = CHR_POSITIONS
         self.update_from_dict(kwargs)
 
@@ -86,7 +74,6 @@ class QTLViewerState(ScatterViewerState):
         self.x_att_helper.set_multiple_data(self.layers_data)
         self.y_att_helper.set_multiple_data(self.layers_data)
         self.lod_att_helper.set_multiple_data(self.layers_data)
-        #self.chr_att_helper.set_multiple_data(self.layers_data)
 
         self._layers_data_cache = layers_data
 
