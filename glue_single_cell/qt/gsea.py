@@ -16,6 +16,15 @@ def convert_genes_to_list(row):
     l = [x for x in arr]
     return l
 
+def convert_to_mouse_ids(row):
+    """
+    Mouse Entrez IDs are like Sox17, while enrichr returns SOX17
+    This function will restore these gene IDs.
+    
+    Ideally we should figure out when we need to capitalize the
+    gene list and only restore if we need to. 
+    """
+    return [x.capitalize() for x in row]
 
 class GSEApyDialog(QtWidgets.QDialog):
 
@@ -46,11 +55,12 @@ class GSEApyDialog(QtWidgets.QDialog):
                     gene_subset = subset
         
         gene_list = self.state.data[self.state.gene_att] # This ignores subset for now and the need to uppercase them all
-        gene_list_upper = [x.upper() for x in gene_list]
+        gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list]
         output = gseapy.enrichr(gene_list=gene_list_upper, description='pathway',
                              gene_sets=self.state.gene_set, no_plot=True)
         
         output.results['Genes'] = output.results['Genes'].apply(convert_genes_to_list)
+        output.results['Genes'] = output.results['Genes'].apply(convert_to_mouse_ids)
         full_list = output.results.explode('Genes') # This is a DataFrame with each pathway-gene pair (+strength of association)
         full_list.set_index('Genes',inplace=True)
         full_term = full_list['Term'].str.get_dummies() # Expand pathways back to columns

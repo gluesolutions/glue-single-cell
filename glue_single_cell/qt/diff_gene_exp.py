@@ -73,7 +73,10 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
          #This could be not well-defined -- but we need both masks in one var -- code mask1 as '1' and mask2 = '2' and everything else as '0'
         
         adata_selected = adata[adata.obs['glue_subsets'] != 0, :]
-        adata_selected = adata_selected.to_memory()  # We should check that this is not going to be too large
+        try:
+            adata_selected = adata_selected.to_memory()  # We should check that this is not going to be too large
+        except ValueError:
+            pass
 
         sc.tl.rank_genes_groups(adata_selected, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
         

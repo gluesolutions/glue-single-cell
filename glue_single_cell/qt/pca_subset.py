@@ -29,20 +29,31 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
     mask = genesubset.to_mask()
     adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
     if calculation == 'PCA':
-        adata_sel = adata_sel.to_memory()
+        try:
+            adata_sel = adata_sel.to_memory()
+        except ValueError:
+            pass
         sc.pp.pca(adata_sel, n_comps=10)
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
         before_memory = time.perf_counter()
-        adata_sel = adata.to_memory()
+        try:
+            adata_sel = adata_sel.to_memory()
+        except ValueError:
+            pass
         after_memory = time.perf_counter()
         print(f"Loaded adata into memory in {after_memory - before_memory:0.2f} seconds", file=open('timing.txt','a'))
-        gene_list = adata_sel.var_names[mask]
+        gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
         before_score = time.perf_counter()
-        sc.tl.score_genes(adata_sel, gene_list = gene_list)
+        try:
+            sc.tl.score_genes(adata_sel, gene_list = gene_list)
+            data_arr = np.expand_dims(adata_sel.obs['score'],axis=1)
+        except ValueError:
+            print("No genes found!")
+            return None
         after_score = time.perf_counter()
         print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
-        data_arr = np.expand_dims(adata_sel.obs['score'],axis=1)
+
     elif calculation == 'Means':
         #print("Starting mean calculation...")
         data_arr = np.expand_dims(adata_sel.X.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
@@ -80,16 +91,17 @@ class GeneSummaryListener(HubListener):
         if subset == self.genesubset:
             #if subset.attributes == self.genesubset_attributes:
             new_data = do_calculation_over_gene_subset(self.adata, self.genesubset, calculation = self.key)
-            mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
-            for x in self.target_dataset.components:  # This is to get the right component ids
-                xstr = f'{x.label}'
-                #print(xstr)
-                if xstr in mapping.keys():
-                    mapping[x] = mapping.pop(xstr)
-                    #del mapping[x.label]
-            #print(mapping)
-            #print([type(k) for k in mapping.keys()])
-            self.target_dataset.update_components(mapping)
+            if new_data is not None:
+                mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
+                for x in self.target_dataset.components:  # This is to get the right component ids
+                    xstr = f'{x.label}'
+                    #print(xstr)
+                    if xstr in mapping.keys():
+                        mapping[x] = mapping.pop(xstr)
+                        #del mapping[x.label]
+                #print(mapping)
+                #print([type(k) for k in mapping.keys()])
+                self.target_dataset.update_components(mapping)
     
     def delete_subset(self, message):
         """
@@ -162,12 +174,13 @@ class PCASubsetDialog(QtWidgets.QDialog):
         elif self.state.do_module:
             key = "Module"
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
-        data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
-        #data.join_on_key(target_dataset,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
-        #self._collect.append(data)
-        for x in data.components:
-            target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
-        target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
+        if data_arr is not None:
+            data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
+            #data.join_on_key(target_dataset,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
+            #self._collect.append(data)
+            for x in data.components:
+                target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
+            target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
 
 
     @classmethod
