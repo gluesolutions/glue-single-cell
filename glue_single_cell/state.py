@@ -95,7 +95,10 @@ class DiffGeneExpState(State):
 
     def _on_data_change(self, *args, **kwargs):
         #self.exp_att_helper.set_multiple_data([] if self.data is None else [self.data])
-        self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data.meta['var_data']])
+        try:
+            self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data.meta['var_data']])
+        except:
+            pass
 
 class PCASubsetState(State):
     
