@@ -80,7 +80,7 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
 
         sc.tl.rank_genes_groups(adata_selected, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
         
-        n_genes = 25 #This should be a user-specified input
+        n_genes = 50 #This should be a user-specified input
         gene_list = [x[0] for x in adata_selected.uns['rank_genes_groups']['names']][0:n_genes]
 
         print(gene_list)
@@ -88,7 +88,7 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         for gene in gene_list:
             state_list.append(vardata.id[self.state.gene_att] == gene)
         final_state = MultiOrState(state_list)
-        self.state.data_collection.new_subset_group(f'DEG between {subset1.label} and {subset2.label}', final_state)
+        self.state.data_collection.new_subset_group(f'DGE between {subset1.label} and {subset2.label}', final_state)
 
     @classmethod
     def create_subset(cls, collect, default=None, parent=None):
