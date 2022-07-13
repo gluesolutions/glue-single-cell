@@ -53,21 +53,16 @@ class GSEApyDialog(QtWidgets.QDialog):
             for subset in self.state.subset.subsets:
                 if subset.data == self.state.data:
                     gene_subset = subset
-        
-        gene_list = self.state.data[self.state.gene_att] # This ignores subset for now and the need to uppercase them all
-        gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list]
-        output = gseapy.enrichr(gene_list=gene_list_upper, description='pathway',
+        gene_list = gene_subset[self.state.gene_att]
+        gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list] Maybe just for humans?
+        output = gseapy.enrichr(gene_list=gene_list_upper, description='pathway', organism='mouse', # Should be an option as well
                              gene_sets=self.state.gene_set, no_plot=True)
         
-        output.results['Genes'] = output.results['Genes'].apply(convert_genes_to_list)
-        output.results['Genes'] = output.results['Genes'].apply(convert_to_mouse_ids)
-        full_list = output.results.explode('Genes') # This is a DataFrame with each pathway-gene pair (+strength of association)
-        full_list.set_index('Genes',inplace=True)
-        full_term = full_list['Term'].str.get_dummies() # Expand pathways back to columns
-        gene_pathways = full_term.groupby('Genes').sum() # Sum over genes associated with each expression. This is now binary
-        gene_pathways.reset_index(inplace=True)
-        self._collect['gene_pathways'] =  gene_pathways
-        self._collect['gene_pathways'].join_on_key(self.state.data,'Genes',self.state.gene_att)
+        self._collect[f'{self.state.gene_set} for {self.state.subset.label}'] = output.results
+        
+        # Theoretically we could then join on the Genes column somehow...
+        # But the Genes column is Gene1;Gene2; etc. so it is not trivial and probably it is not interesting to do this.
+        
         
     @classmethod
     def enrich(cls, collect, default=None, parent=None):
