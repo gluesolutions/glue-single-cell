@@ -35,7 +35,7 @@ class QTLViewerState(ScatterViewerState):
     
         super(QTLViewerState, self).__init__(**kwargs)
 
-        self.lod_att_helper = ComponentIDComboHelper(self, 'lod_att', numeric=True)
+        self.lod_att_helper = ComponentIDComboHelper(self, 'lod_att', numeric=True, categorical=False)
         self.species_helper = ComboHelper(self, 'species')
         self.pos_units_helper = ComboHelper(self, 'pos_units')
 
