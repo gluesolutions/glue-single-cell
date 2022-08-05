@@ -176,8 +176,6 @@ class PCASubsetDialog(QtWidgets.QDialog):
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
         if data_arr is not None:
             data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
-            #data.join_on_key(target_dataset,'Pixel Axis 0 [x]','Pixel Axis 0 [x]')
-            #self._collect.append(data)
             for x in data.components:
                 target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
             target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
