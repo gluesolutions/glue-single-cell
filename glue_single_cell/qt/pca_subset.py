@@ -16,7 +16,7 @@ from ..state import PCASubsetState
 from ..anndata_factory import df_to_data
 
 import scanpy as sc
-
+from scipy.sparse import issparse
 import time
 
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
@@ -25,10 +25,12 @@ __all__ = ['PCASubsetDialog','GeneSummaryListener']
 def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
     """
     """
+    raw = True
     #print("Getting mask...")
     mask = genesubset.to_mask()
-    adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
+    #Slicing the adata object is probably not the fastest thing we can do
     if calculation == 'PCA':
+        adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
         try:
             adata_sel = adata_sel.to_memory()
         except ValueError:
@@ -36,6 +38,8 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         sc.pp.pca(adata_sel, n_comps=10)
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
+        adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
+
         before_memory = time.perf_counter()
         try:
             adata_sel = adata_sel.to_memory()
@@ -46,8 +50,8 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
         before_score = time.perf_counter()
         try:
-            sc.tl.score_genes(adata_sel, gene_list = gene_list)
-            data_arr = np.expand_dims(adata_sel.obs['score'],axis=1)
+            sc.tl.score_genes(adata, gene_list = gene_list)
+            data_arr = np.expand_dims(adata.obs['score'],axis=1)
         except ValueError:
             print("No genes found!")
             return None
@@ -55,8 +59,13 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
         print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
 
     elif calculation == 'Means':
-        #print("Starting mean calculation...")
-        data_arr = np.expand_dims(adata_sel.X.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
+        if raw:
+            adata_sel = adata.raw.X[: , mask]  # This will fail if genesubset is not actually over genes
+            if issparse(adata.raw.X):
+                data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
+        else:
+            adata_sel = adata.X[: , mask]
+            data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
         #print("Mean calculation finished")
     return data_arr
 
@@ -174,6 +183,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
         elif self.state.do_module:
             key = "Module"
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
+        print(f"{data_arr.shape=}")
         if data_arr is not None:
             data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
             for x in data.components:
