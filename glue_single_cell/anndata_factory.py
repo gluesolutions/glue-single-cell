@@ -36,7 +36,7 @@ def setup_gui_joins(dc, data):
     when a DataAnnData object is added to a data collection.
     """
     try:  # If we are using a version of glue that supports links in the GUI
-        from glue.plugins.join_on_key.link_helpers import Join_Link
+        from glue.core.link_helpers import JoinLink
         do_gui_link = True
     except ImportError:
         print("Cannot set up GUI join_on_key links")
@@ -44,7 +44,7 @@ def setup_gui_joins(dc, data):
     if do_gui_link:
         for other,joins in data._key_joins.items():
             cid, cid_other = joins
-            gui_link = Join_Link(cids1=[cid[0]], cids2=[cid_other[0]], data1=data, data2=other)
+            gui_link = JoinLink(cids1=[cid[0]], cids2=[cid_other[0]], data1=data, data2=other)
             if gui_link not in dc._link_manager._external_links:
                 dc.add_link(gui_link)
 
