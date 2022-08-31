@@ -25,7 +25,7 @@ __all__ = ['PCASubsetDialog','GeneSummaryListener']
 def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
     """
     """
-    raw = True
+    raw = False
     #print("Getting mask...")
     mask = genesubset.to_mask()
     #Slicing the adata object is probably not the fastest thing we can do

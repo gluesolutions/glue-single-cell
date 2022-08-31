@@ -5,6 +5,11 @@ from glue.core import Data
 from glue.core import DataCollection
 from glue.core.message import DataCollectionAddMessage
 from glue.core import Hub, HubListener
+from glue.core.qt.dialogs import warn
+from glue.utils.qt import set_cursor_cm
+
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import Qt
 
 from pathlib import Path
 import anndata
@@ -12,13 +17,16 @@ import scanpy as sc
 
 from .data import DataAnnData
 
+from .qt.load_data import LoadDataDialog
+
 __all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', 'DataAnnDataListener', 'setup_anndata']
 
 
-def df_to_data(obj,label=None):
+def df_to_data(obj, label=None, filter_components=[]):
     result = Data(label=label)
     for c in obj.columns:
-        result.add_component(obj[c], str(c))
+        if c in filter_components:
+            result.add_component(obj[c], str(c))
     return result
 
 def is_anndata(filename, **kwargs):
@@ -86,7 +94,7 @@ def join_anndata_on_keys(datasets):
 
 
 @data_factory('AnnData data loader', is_anndata, priority=999)
-def read_anndata(file_name):
+def read_anndata(file_name, skip_dialog=False):
     """
     Use AnnData to read a file from disk
     
@@ -96,10 +104,20 @@ def read_anndata(file_name):
     """
     list_of_data_objs = []
     basename = Path(file_name).stem
-    adata = sc.read(file_name, sparse=True)#, backed='r+')
-    
+
+    with set_cursor_cm(Qt.ArrowCursor):
+        load_dialog = LoadDataDialog(filename = file_name)
+        if load_dialog.exec_():
+            components = load_dialog.components
+            subsample = load_dialog.subsample
+            try_backed = load_dialog.try_backed
+        else:
+            return []
+        
+    adata = sc.read(file_name, sparse=True, backed=try_backed)#, backed='r+')
+
     # Get the X array as a special glue Data object
-    XData = DataAnnData(adata, label=f'{basename}_X')#, filemode='r+')
+    XData = DataAnnData(adata, label=f'{basename}_X', filemode=try_backed)
     XData.meta['orig_filename'] = basename
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
@@ -112,8 +130,8 @@ def read_anndata(file_name):
     # and is stored by AnnData as a Pandas DataFrame
     try:
         var = adata.var
-        var_data = df_to_data(var,label=f'{basename}_vars')
-        var_data.add_component(adata.var_names,"var_names")
+        var_data = df_to_data(var, label=f'{basename}_vars', filter_components=components)
+        var_data.add_component(adata.var_names, "var_names")
         var_data.meta['Xdata'] = XData.uuid
         var_data.meta['anndatatype'] = 'var Array'
         var_data.meta['join_on_obs'] = False
@@ -124,18 +142,19 @@ def read_anndata(file_name):
         pass
     
     for key in adata.varm_keys():
-        data_arr = adata.varm[key]
-        data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
-        for comp_name, comp in data_to_add.items():
-            var_data.add_component(comp,comp_name)
+        if key in components:
+            data_arr = adata.varm[key]
+            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+            for comp_name, comp in data_to_add.items():
+                var_data.add_component(comp,comp_name)
     
     
     # The obs array is all components of the same length
     # and is stored by AnnData as a Pandas DataFrame
     try:
         obs = adata.obs
-        obs_data = df_to_data(obs,label=f'{basename}_obs')
-        obs_data.add_component(adata.obs_names,"var_names")
+        obs_data = df_to_data(obs, label=f'{basename}_obs', filter_components=components)
+        obs_data.add_component(adata.obs_names, "var_names")
         obs_data.meta['Xdata'] = XData.uuid
         obs_data.meta['anndatatype'] = 'obs Array'
         obs_data.meta['join_on_obs'] = True
@@ -146,10 +165,11 @@ def read_anndata(file_name):
         pass
     
     for key in adata.obsm_keys():
-        data_arr = adata.obsm[key]
-        data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
-        for comp_name, comp in data_to_add.items():
-            obs_data.add_component(comp,comp_name)
+        if key in components:
+            data_arr = adata.obsm[key]
+            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+            for comp_name, comp in data_to_add.items():
+                obs_data.add_component(comp,comp_name)
 
     return join_anndata_on_keys(list_of_data_objs)
 
