@@ -7,6 +7,7 @@ from glue.core.message import DataCollectionAddMessage
 from glue.core import Hub, HubListener
 from glue.core.qt.dialogs import warn
 from glue.utils.qt import set_cursor_cm
+from glue.core.qt.dialogs import warn
 
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
@@ -22,10 +23,10 @@ from .qt.load_data import LoadDataDialog
 __all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', 'DataAnnDataListener', 'setup_anndata']
 
 
-def df_to_data(obj, label=None, filter_components=[]):
+def df_to_data(obj, label=None, skip_components=[]):
     result = Data(label=label)
     for c in obj.columns:
-        if c in filter_components:
+        if c not in skip_components:
             result.add_component(obj[c], str(c))
     return result
 
@@ -105,16 +106,29 @@ def read_anndata(file_name, skip_dialog=False):
     list_of_data_objs = []
     basename = Path(file_name).stem
 
-    with set_cursor_cm(Qt.ArrowCursor):
-        load_dialog = LoadDataDialog(filename = file_name)
-        if load_dialog.exec_():
-            components = load_dialog.components
-            subsample = load_dialog.subsample
-            try_backed = load_dialog.try_backed
-        else:
-            return []
+    if skip_dialog:
+        skip_components = []
+        subsample = False
+        try_backed = False
+        subsample_factor = 1
+    else:
+        with set_cursor_cm(Qt.ArrowCursor):
+            load_dialog = LoadDataDialog(filename = file_name)
+            if load_dialog.exec_():
+                skip_components = load_dialog.skip_components
+                subsample = load_dialog.subsample
+                try_backed = load_dialog.try_backed
+                subsample_factor = load_dialog.subsample_factor
+            else:
+                return []
         
     adata = sc.read(file_name, sparse=True, backed=try_backed)#, backed='r+')
+
+    # We could maybe do something better here
+    # https://github.com/scverse/scanpy/issues/987
+    # for now we just subsample on obs/cells
+    if subsample:
+        adata = sc.pp.subsample(adata, fraction = subsample_factor, copy=True)
 
     # Get the X array as a special glue Data object
     XData = DataAnnData(adata, label=f'{basename}_X', filemode=try_backed)
@@ -130,7 +144,7 @@ def read_anndata(file_name, skip_dialog=False):
     # and is stored by AnnData as a Pandas DataFrame
     try:
         var = adata.var
-        var_data = df_to_data(var, label=f'{basename}_vars', filter_components=components)
+        var_data = df_to_data(var, label=f'{basename}_vars', skip_components=skip_components)
         var_data.add_component(adata.var_names, "var_names")
         var_data.meta['Xdata'] = XData.uuid
         var_data.meta['anndatatype'] = 'var Array'
@@ -142,7 +156,7 @@ def read_anndata(file_name, skip_dialog=False):
         pass
     
     for key in adata.varm_keys():
-        if key in components:
+        if key not in skip_components:
             data_arr = adata.varm[key]
             data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
             for comp_name, comp in data_to_add.items():
@@ -153,8 +167,8 @@ def read_anndata(file_name, skip_dialog=False):
     # and is stored by AnnData as a Pandas DataFrame
     try:
         obs = adata.obs
-        obs_data = df_to_data(obs, label=f'{basename}_obs', filter_components=components)
-        obs_data.add_component(adata.obs_names, "var_names")
+        obs_data = df_to_data(obs, label=f'{basename}_obs', skip_components=skip_components)
+        obs_data.add_component(adata.obs_names, "obs_names")
         obs_data.meta['Xdata'] = XData.uuid
         obs_data.meta['anndatatype'] = 'obs Array'
         obs_data.meta['join_on_obs'] = True
@@ -165,7 +179,7 @@ def read_anndata(file_name, skip_dialog=False):
         pass
     
     for key in adata.obsm_keys():
-        if key in components:
+        if key not in skip_components:
             data_arr = adata.obsm[key]
             data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
             for comp_name, comp in data_to_add.items():

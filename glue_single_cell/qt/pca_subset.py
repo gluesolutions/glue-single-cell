@@ -11,6 +11,7 @@ from glue.core.message import (SubsetMessage,
                                SubsetUpdateMessage,
                                SubsetDeleteMessage,
                                )
+from glue.core.exceptions import IncompatibleAttribute
 
 from ..state import PCASubsetState
 from ..anndata_factory import df_to_data
@@ -22,12 +23,16 @@ import time
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
-def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
+def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
     """
     """
     raw = False
     #print("Getting mask...")
-    mask = genesubset.to_mask()
+    try:
+        mask = genesubset.to_mask()
+    except IncompatibleAttribute:
+        print("Failed!") # TODO: Present a dialog box for this!
+        return None
     #Slicing the adata object is probably not the fastest thing we can do
     if calculation == 'PCA':
         adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
@@ -63,11 +68,32 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'PCA'):
             adata_sel = adata.raw.X[: , mask]  # This will fail if genesubset is not actually over genes
             if issparse(adata.raw.X):
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
+            else:
+                data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
+
         else:
             adata_sel = adata.X[: , mask]
-            data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1)  # Expand to make same dimensionality as PCA
+            if issparse(adata.X):
+                data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
+            else:
+                data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
+
         #print("Mean calculation finished")
     return data_arr
+
+def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
+    """
+    This is a sort of clunky approach to doing this.
+
+    We generate a Data object from the data_arr that was returned
+    But they we have to exclude the pixel coordinates
+    """
+    
+    data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
+    for x in data.components:
+        if x not in data.coordinate_components: 
+            target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
+
 
 class GeneSummaryListener(HubListener):
     """
@@ -185,9 +211,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
         print(f"{data_arr.shape=}")
         if data_arr is not None:
-            data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
-            for x in data.components:
-                target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
+            apply_data_arr(target_dataset, data_arr, basename, key=key)
             target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
 
 

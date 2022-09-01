@@ -68,7 +68,8 @@ class LoadDataDialog(QDialog):
         
         self.subsample = False
         self.try_backed = None # This is the default for scanpy.read to read into memory
-        self.components = []
+        self.skip_components = []
+        self.subsample_factor = 1
         trial_read = ad.read(filename,backed='r')
         nobs = trial_read.n_obs
         nvars = trial_read.n_vars
@@ -117,8 +118,13 @@ class LoadDataDialog(QDialog):
 
         if nobs*nvars > 1e8:
             do_large_x_warning = True
+            self.subsample_factor = 1e7/(nobs*nvars)
         else:
             do_large_x_warning = False
+            self.subsample_factor = 0.1 # If the data is not that large, just do 10%
+
+    
+        
 
         if do_large_x_warning:
             self.ui.label_largex_warning.setText(LARGE_X_WARNING)
@@ -196,12 +202,12 @@ class LoadDataDialog(QDialog):
             item.setCheckState(Qt.Checked if check_state else Qt.Unchecked)
 
     def set_components(self):
-        components = []
+        skip_components = []
         for idx in range(self.ui.list_component.count()):
             item = self.ui.list_component.item(idx)
-            if item.checkState() == Qt.Checked:
-                components.append(item.text())
-        self.components = components
+            if item.checkState() != Qt.Checked:
+                skip_components.append(item.text())
+        self.skip_components = skip_components
 
     def accept(self):
         self.set_components()
