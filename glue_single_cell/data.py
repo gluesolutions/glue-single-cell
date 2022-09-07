@@ -11,11 +11,11 @@ functions on the AnnData object without much additional
 bookkeeping. 
 
 AnnData objects include many things of different dimensions.
-This DataAnnData class only exposes the X matrix of
-raw data values with dimension num_obs x num_vars as a glue
-component. The other parts of the AnnData object are
-stored as regular glue data objects -- their creation and
-linking with the DataAnnData is handled by the data loader.
+This DataAnnData class only exposes the X matrix of data values
+with dimension num_obs x num_vars as a glue component. The other
+parts of the AnnData object are stored as regular glue data
+objects -- their creation and linking with the DataAnnData is
+handled by the data loader.
 
 All the obsm arrays and obs table are combined as one dataset
 All the varm arrays and var table are combined as one dataset
