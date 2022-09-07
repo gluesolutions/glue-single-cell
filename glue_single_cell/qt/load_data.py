@@ -118,7 +118,8 @@ class LoadDataDialog(QDialog):
 
         if nobs*nvars > 1e8:
             do_large_x_warning = True
-            self.subsample_factor = max(1e8/(nobs*nvars),10_000) #Never go below 10,000 obs
+            minimum_points = 10_000/nobs # We always keep at least 10_000 obs
+            self.subsample_factor = max(1e8/(nobs*nvars),minimum_points)
         else:
             do_large_x_warning = False
             self.subsample_factor = 0.1 # If the data is not that large, just do 10%
