@@ -33,6 +33,8 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
     except IncompatibleAttribute:
         print("Failed!") # TODO: Present a dialog box for this!
         return None
+    if mask.sum() == 0:
+        return None
     #Slicing the adata object is probably not the fastest thing we can do
     if calculation == 'PCA':
         adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
