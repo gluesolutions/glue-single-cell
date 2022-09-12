@@ -3,6 +3,9 @@ import pytest
 import numpy as np
 from glue.core import Data
 from glue.app.qt import GlueApplication
+from glue.core.state import GlueUnSerializer
+from glue.utils.qt import process_events
+
 from glue.core.roi import RectangularROI
 
 from numpy.testing import assert_allclose, assert_equal
@@ -113,3 +116,24 @@ class TestScatterViewer(object):
         sub_data = self.viewer.layers[1].scatter_artist.get_offsets()
         
         assert_equal(sub_data, [[1125339623, 1125562888]]) #This is not a masked array?
+
+    def test_session_save_and_restore(self, tmpdir):
+        viewer_state = self.viewer.state
+        self.viewer.add_data(self.data)
+        process_events()
+        filename = tmpdir.join('test_qtl_session.glu').strpath
+
+        self.session.application.save_session(filename)
+
+        with open(filename, 'r') as f:
+            session = f.read()
+
+        state = GlueUnSerializer.loads(session)
+
+        ga = state.object('__main__')
+
+        dc = ga.session.data_collection
+
+        viewer = ga.viewers[0][0]
+        assert viewer.state.lod_att is dc[0].id['z']
+        ga.close()
