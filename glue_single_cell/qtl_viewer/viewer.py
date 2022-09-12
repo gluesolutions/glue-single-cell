@@ -1,4 +1,6 @@
-from glue.viewers.scatter.qt.data_viewer import ScatterViewer
+from glue.viewers.scatter.viewer import MatplotlibScatterMixin
+from glue.viewers.matplotlib.qt.data_viewer import MatplotlibDataViewer
+
 from glue.viewers.scatter.layer_artist import ScatterLayerArtist
 from glue.utils import defer_draw, decorate_all_methods
 
@@ -16,9 +18,9 @@ from glue.core.roi_pretransforms import ProjectionMplTransform #Probably not nee
 __all__ = ['QTLViewer']
 
 @decorate_all_methods(defer_draw)
-class QTLViewer(ScatterViewer):
+class QTLViewer(MatplotlibScatterMixin, MatplotlibDataViewer):
     LABEL = 'QTL Viewer'
-    _layer_style_widget_cls = QTLLayerStyleEditor # We can just reuse this layer style for now, although eventually we should trim options that do not make sense
+    _layer_style_widget_cls = QTLLayerStyleEditor # We should trim options that do not make sense
     _state_cls = QTLViewerState
     _options_cls = QTLOptionsWidget # This has the LOD level widget
     _data_artist_cls = QTLLayerArtist 
@@ -28,10 +30,11 @@ class QTLViewer(ScatterViewer):
      'select:yrange']
 
     def __init__(self, session, parent=None, state=None):
-        super(QTLViewer, self).__init__(session, parent=parent, state=state)
+        proj = None
+        MatplotlibDataViewer.__init__(self, session, parent=parent, state=state, projection=proj)
+        MatplotlibScatterMixin.setup_callbacks(self)
         self.state.add_callback('species',self._update_axes)
         self.state.add_callback('pos_units',self._update_axes)
-
 
     def _update_axes(self, *args):
         
