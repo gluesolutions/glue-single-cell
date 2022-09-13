@@ -48,6 +48,15 @@ class TestScatterViewer(object):
 
         assert len(viewer_state.layers) == 1
         
+    def test_lod_limits(self):
+        viewer_state = self.viewer.state
+        self.viewer.add_data(self.data)
+        assert viewer_state.lod_min == min(self.data['z'])
+        assert viewer_state.lod_max == max(self.data['z'])
+
+        viewer_state.lod_att = self.data.id['z']
+        assert viewer_state.lod_thresh == viewer_state.lod_min # When we start we set thresh to the min
+
     def test_lod_roi(self):
         """
         Currently lod_thresh creates a lod_mask inside
