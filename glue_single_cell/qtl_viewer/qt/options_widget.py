@@ -107,7 +107,7 @@ class QTLOptionsWidget(QtWidgets.QWidget):
         
         self._clear()
 
-        lod_slider = SliderLabelWidget(label='LOD Thresh',
+        lod_slider = SliderLabelWidget(label='Thresh',
                                         lo = self.viewer_state.lod_min,
                                         hi = self.viewer_state.lod_max)
         self._slider = lod_slider
