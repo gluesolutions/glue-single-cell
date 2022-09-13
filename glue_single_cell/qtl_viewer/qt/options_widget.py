@@ -1,10 +1,11 @@
 import os
 from qtpy import QtWidgets
-from echo import keep_in_sync
+from echo import keep_in_sync, delay_callback, ignore_callback
 from echo.qt import autoconnect_callbacks_to_qt, connect_value
 from glue.utils.qt import load_ui, fix_tab_widget_fontsize
 from glue.core.state_objects import State, CallbackProperty
 from glue.utils import nonpartial
+from glue.utils.decorators import avoid_circular
 
 __all__ = ['SliderState','SliderLabelWidget','QTLOptionsWidget']
 
@@ -40,12 +41,13 @@ class SliderLabelWidget(QtWidgets.QWidget):
 
         self.set_label_from_slider()
 
+    @avoid_circular
     def set_label_from_slider(self):
         value = self.state.slider_pos
         self.state.slider_label = self.label_fmt.format(value)
 
+    @avoid_circular
     def set_slider_from_label(self):
-
         # Ignore recursive calls - we do this rather than ignore_callback
         # below when setting slider_label, otherwise we might be stopping other
         # subscribers to that event from being correctly updated

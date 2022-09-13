@@ -4,6 +4,7 @@ from glue.core.data_combo_helper import ComponentIDComboHelper, ComboHelper
 from glue.core.state_objects import StateAttributeLimitsHelper
 
 from glue.viewers.scatter.state import ScatterViewerState
+from glue.utils.decorators import avoid_circular
 
 __all__ = ['QTLViewerState']
 
@@ -65,7 +66,7 @@ class QTLViewerState(ScatterViewerState):
         except IndexError:
             pass
         self.pos_units_helper.display = display_unit_names
-        self.add_callback('lod_att', self._adjust_lod_thresh, priority=10000)
+        self.add_callback('lod_att', self._adjust_lod_thresh)
 
         self._adjust_lod_thresh()
         self.update_from_dict(kwargs)
@@ -90,10 +91,10 @@ class QTLViewerState(ScatterViewerState):
         """
         """
         print("Calling _adjust_lod_thresh")
-        if self.lod_att is None or self.lod_min is None:
+        if self.lod_att is None:
             print("Returning...")
             return
-        print("setting {selflod_thresh=} to {self.lod_min=}")
+        print(f"setting {self.lod_thresh=} to {self.lod_min=}")
         self.lod_thresh = self.lod_min
 
         # Not sure we need anything here...

@@ -17,7 +17,7 @@ class TestScatterViewer(object):
     def setup_method(self, method):
     
         self.data = Data(label='d1', x=[1125339623, 3025778038, 3025778038, 497597140],
-                         y=[1125562888, 3026087386, 259628224, 498042878], z=[41, 28, 11, 9])
+                         y=[1125562888, 3026087386, 259628224, 498042878], z=[41, 28, 11, 9], z2 = [0.1,0.3,0.4,0.5])
     
         self.app = GlueApplication()
         self.session = self.app.session
@@ -54,8 +54,10 @@ class TestScatterViewer(object):
         assert viewer_state.lod_min == min(self.data['z'])
         assert viewer_state.lod_max == max(self.data['z'])
 
-        viewer_state.lod_att = self.data.id['z']
-        assert viewer_state.lod_thresh == viewer_state.lod_min # When we start we set thresh to the min
+        assert viewer_state.lod_thresh == viewer_state.lod_min
+
+        viewer_state.lod_att = self.data.id['z2']
+        assert viewer_state.lod_thresh == viewer_state.lod_min
 
     def test_lod_roi(self):
         """
