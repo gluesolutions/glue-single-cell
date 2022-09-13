@@ -84,6 +84,8 @@ class QTLOptionsWidget(QtWidgets.QWidget):
         connect_kwargs = {'alpha': dict(value_range=(0, 1))}
         self._connections_legend = autoconnect_callbacks_to_qt(viewer_state.legend, self.ui.legend_editor.ui, connect_kwargs)
         self.layout = self.ui.layout_slices
+        self.layout.setSpacing(4)
+        self.layout.setContentsMargins(0, 3, 0, 3)
 
         self.viewer_state = viewer_state
 
@@ -100,13 +102,10 @@ class QTLOptionsWidget(QtWidgets.QWidget):
         self._slider = None
 
     def update_slider_widget(self, *args):
-        print("In update_slider_widget")
         if self.viewer_state.lod_att is None:
             return
         
         self._clear()
-
-        print("Creating SliderLabelWidget")
 
         lod_slider = SliderLabelWidget(label='LOD Thresh',
                                         lo = self.viewer_state.lod_min,

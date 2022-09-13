@@ -131,6 +131,8 @@ class TestScatterViewer(object):
     def test_session_save_and_restore(self, tmpdir):
         viewer_state = self.viewer.state
         self.viewer.add_data(self.data)
+        viewer_state.lod_att = self.data.id['z2']
+        viewer_state.lod_thresh = 0.3
         process_events()
         filename = tmpdir.join('test_qtl_session.glu').strpath
 
@@ -146,5 +148,6 @@ class TestScatterViewer(object):
         dc = ga.session.data_collection
 
         viewer = ga.viewers[0][0]
-        assert viewer.state.lod_att is dc[0].id['z']
+        assert viewer.state.lod_att is dc[0].id['z2']
+        assert viewer.state.lod_thresh == 0.3
         ga.close()

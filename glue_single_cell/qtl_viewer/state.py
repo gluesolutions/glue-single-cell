@@ -66,10 +66,12 @@ class QTLViewerState(ScatterViewerState):
         except IndexError:
             pass
         self.pos_units_helper.display = display_unit_names
-        self.add_callback('lod_att', self._adjust_lod_thresh)
 
-        self._adjust_lod_thresh()
+        #self._adjust_lod_thresh()
         self.update_from_dict(kwargs)
+        # Setup callback only after update_from_dict
+        # otherwise session files do not save lod_thresh
+        self.add_callback('lod_att', self._adjust_lod_thresh) 
 
 
     def _layers_changed(self, *args):
@@ -89,12 +91,9 @@ class QTLViewerState(ScatterViewerState):
 
     def _adjust_lod_thresh(self, *args):
         """
+        When we change lod_add, we'll set the threhold to the
+        minimum value in order to show all the data.
         """
-        print("Calling _adjust_lod_thresh")
         if self.lod_att is None:
-            print("Returning...")
             return
-        print(f"setting {self.lod_thresh=} to {self.lod_min=}")
         self.lod_thresh = self.lod_min
-
-        # Not sure we need anything here...
