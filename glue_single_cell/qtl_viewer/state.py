@@ -1,8 +1,10 @@
 from glue.viewers.matplotlib.state import (DeferredDrawCallbackProperty as DDCProperty,
                                            DeferredDrawSelectionCallbackProperty as DDSCProperty)
 from glue.core.data_combo_helper import ComponentIDComboHelper, ComboHelper
+from glue.core.state_objects import StateAttributeLimitsHelper
 
 from glue.viewers.scatter.state import ScatterViewerState
+from glue.utils.decorators import avoid_circular
 
 __all__ = ['QTLViewerState']
 
@@ -28,13 +30,22 @@ class QTLViewerState(ScatterViewerState):
     pos_units = DDSCProperty(0, docstring='Units for gene and marker position')
 
     lod_att = DDSCProperty(docstring='The attribute giving the LOD score ', default_index=2)
-    lod_thresh = DDCProperty(0, docstring='The LOD threshold for display and subsets')
+    lod_thresh = DDCProperty(-99, docstring='The LOD threshold for display and subsets')
+
+    lod_min = DDCProperty(docstring='Lower limit of the visible x range')
+    lod_max = DDCProperty(docstring='Upper limit of the visible x range')
 
     def __init__(self, **kwargs):
         super().__init__()
 
+
+        self.lod_lim_helper = StateAttributeLimitsHelper(self, attribute='lod_att',
+                                                   lower='lod_min', upper='lod_max',
+                                                   margin=0,)
+
         self.lod_att_helper = ComponentIDComboHelper(self, 'lod_att', numeric=True, categorical=False)
-    
+        
+
         self.species_helper = ComboHelper(self, 'species')
         self.pos_units_helper = ComboHelper(self, 'pos_units')
 
@@ -56,7 +67,11 @@ class QTLViewerState(ScatterViewerState):
             pass
         self.pos_units_helper.display = display_unit_names
 
+        #self._adjust_lod_thresh()
         self.update_from_dict(kwargs)
+        # Setup callback only after update_from_dict
+        # otherwise session files do not save lod_thresh
+        self.add_callback('lod_att', self._adjust_lod_thresh) 
 
 
     def _layers_changed(self, *args):
@@ -76,17 +91,9 @@ class QTLViewerState(ScatterViewerState):
 
     def _adjust_lod_thresh(self, *args):
         """
-        We don't do anything here yet
-
-        self.state.lod_thresh will be used by the viewer to apply_roi
-        and by the layer_artist to show what to display, and that's it.
-
-        We could use this to filter existing subsets
-        to a new LOD as we move the slider but
-        we do not do that. The user must make a new
-        subset selection in order to change the subset
-        definition
+        When we change lod_add, we'll set the threhold to the
+        minimum value in order to show all the data.
         """
-        pass
-
-        # Not sure we need anything here...
+        if self.lod_att is None:
+            return
+        self.lod_thresh = self.lod_min

@@ -17,7 +17,7 @@ class TestScatterViewer(object):
     def setup_method(self, method):
     
         self.data = Data(label='d1', x=[1125339623, 3025778038, 3025778038, 497597140],
-                         y=[1125562888, 3026087386, 259628224, 498042878], z=[41, 28, 11, 9])
+                         y=[1125562888, 3026087386, 259628224, 498042878], z=[41, 28, 11, 9], z2 = [0.1,0.3,0.4,0.5])
     
         self.app = GlueApplication()
         self.session = self.app.session
@@ -48,6 +48,17 @@ class TestScatterViewer(object):
 
         assert len(viewer_state.layers) == 1
         
+    def test_lod_limits(self):
+        viewer_state = self.viewer.state
+        self.viewer.add_data(self.data)
+        assert viewer_state.lod_min == min(self.data['z'])
+        assert viewer_state.lod_max == max(self.data['z'])
+
+        assert viewer_state.lod_thresh == viewer_state.lod_min
+
+        viewer_state.lod_att = self.data.id['z2']
+        assert viewer_state.lod_thresh == viewer_state.lod_min
+
     def test_lod_roi(self):
         """
         Currently lod_thresh creates a lod_mask inside
@@ -120,6 +131,8 @@ class TestScatterViewer(object):
     def test_session_save_and_restore(self, tmpdir):
         viewer_state = self.viewer.state
         self.viewer.add_data(self.data)
+        viewer_state.lod_att = self.data.id['z2']
+        viewer_state.lod_thresh = 0.3
         process_events()
         filename = tmpdir.join('test_qtl_session.glu').strpath
 
@@ -135,5 +148,6 @@ class TestScatterViewer(object):
         dc = ga.session.data_collection
 
         viewer = ga.viewers[0][0]
-        assert viewer.state.lod_att is dc[0].id['z']
+        assert viewer.state.lod_att is dc[0].id['z2']
+        assert viewer.state.lod_thresh == 0.3
         ga.close()
