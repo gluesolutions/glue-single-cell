@@ -118,17 +118,85 @@ def join_anndata_on_keys(datasets):
     return datasets
 
 
-@data_factory("New AnnData Loader", is_anndata, priority=1)
-def read_anndata_new(file_name):
-    basename = Path(file_name).stem
-    adata = sc.read(file_name, sparse=True, backed=False)
-    return AnnData(X=adata.X, label=f'{basename}_X')
-
-
-@data_factory('AnnData data loader', is_anndata, priority=999)
-def read_anndata(file_name, skip_dialog=False):
+@data_factory("AnnData Loader", is_anndata, priority=999)
+def read_anndata(file_name, skip_dialog=True):
     """
-    Use AnnData to read a file from disk
+    Use Scanpy/AnnData to read a file from disk
+    
+    Currently supports .loom and .h5ad files, but .loom files
+    are read into memory (anndata library does not support
+    a file-backed mode for them) which may cause memory issues.
+    """
+    list_of_data_objs = []
+    basename = Path(file_name).stem
+
+    if skip_dialog:
+        skip_components = []
+        subsample = False
+        try_backed = False
+        subsample_factor = 1
+
+    adata = sc.read(file_name, sparse=True, backed=False)
+    XData = AnnData(Xarray=adata.X, label=f'{basename}_X')
+    XData.meta['orig_filename'] = basename
+    XData.meta['Xdata'] = XData.uuid
+    XData.meta['anndatatype'] = 'X Array'
+    XData.meta['join_on_obs'] = True
+    XData.meta['join_on_var'] = True
+
+    list_of_data_objs.append(XData)
+
+    # The var array is all components of the same length
+    # and is stored by AnnData as a Pandas DataFrame
+    try:
+        var = adata.var
+        var_data = df_to_data(var, label=f'{basename}_vars', skip_components=skip_components)
+        var_data.add_component(adata.var_names, "var_names")
+        var_data.meta['Xdata'] = XData.uuid
+        var_data.meta['anndatatype'] = 'var Array'
+        var_data.meta['join_on_obs'] = False
+        var_data.meta['join_on_var'] = True
+        XData.meta['var_data'] = var_data 
+        list_of_data_objs.append(var_data)
+    except:
+        pass
+
+    for key in adata.varm_keys():
+        if key not in skip_components:
+            data_arr = adata.varm[key]
+            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+            for comp_name, comp in data_to_add.items():
+                var_data.add_component(comp,comp_name)
+
+    # The obs array is all components of the same length
+    # and is stored by AnnData as a Pandas DataFrame
+    try:
+        obs = adata.obs
+        obs_data = df_to_data(obs, label=f'{basename}_obs', skip_components=skip_components)
+        obs_data.add_component(adata.obs_names, "obs_names")
+        obs_data.meta['Xdata'] = XData.uuid
+        obs_data.meta['anndatatype'] = 'obs Array'
+        obs_data.meta['join_on_obs'] = True
+        obs_data.meta['join_on_var'] = False
+        XData.meta['obs_data'] = obs_data
+        list_of_data_objs.append(obs_data)
+    except:
+        pass
+    
+    for key in adata.obsm_keys():
+        if key not in skip_components:
+            data_arr = adata.obsm[key]
+            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
+            for comp_name, comp in data_to_add.items():
+                obs_data.add_component(comp,comp_name)
+
+    return join_anndata_on_keys(list_of_data_objs)
+
+
+@data_factory('Old AnnData data loader', is_anndata, priority=1)
+def old_read_anndata(file_name, skip_dialog=False):
+    """
+    Use Scanpy/AnnData to read a file from disk
     
     Currently supports .loom and .h5ad files, but .loom files
     are read into memory (anndata library does not support
@@ -169,54 +237,7 @@ def read_anndata(file_name, skip_dialog=False):
     XData.meta['join_on_obs'] = True
     XData.meta['join_on_var'] = True
     
-    list_of_data_objs.append(XData)
-    
-    # The var array is all components of the same length
-    # and is stored by AnnData as a Pandas DataFrame
-    try:
-        var = adata.var
-        var_data = df_to_data(var, label=f'{basename}_vars', skip_components=skip_components)
-        var_data.add_component(adata.var_names, "var_names")
-        var_data.meta['Xdata'] = XData.uuid
-        var_data.meta['anndatatype'] = 'var Array'
-        var_data.meta['join_on_obs'] = False
-        var_data.meta['join_on_var'] = True
-        XData.meta['var_data'] = var_data 
-        list_of_data_objs.append(var_data)
-    except:
-        pass
-    
-    for key in adata.varm_keys():
-        if key not in skip_components:
-            data_arr = adata.varm[key]
-            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
-            for comp_name, comp in data_to_add.items():
-                var_data.add_component(comp,comp_name)
-    
-    
-    # The obs array is all components of the same length
-    # and is stored by AnnData as a Pandas DataFrame
-    try:
-        obs = adata.obs
-        obs_data = df_to_data(obs, label=f'{basename}_obs', skip_components=skip_components)
-        obs_data.add_component(adata.obs_names, "obs_names")
-        obs_data.meta['Xdata'] = XData.uuid
-        obs_data.meta['anndatatype'] = 'obs Array'
-        obs_data.meta['join_on_obs'] = True
-        obs_data.meta['join_on_var'] = False
-        XData.meta['obs_data'] = obs_data
-        list_of_data_objs.append(obs_data)
-    except:
-        pass
-    
-    for key in adata.obsm_keys():
-        if key not in skip_components:
-            data_arr = adata.obsm[key]
-            data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
-            for comp_name, comp in data_to_add.items():
-                obs_data.add_component(comp,comp_name)
 
-    return join_anndata_on_keys(list_of_data_objs)
 
 
 

@@ -70,6 +70,7 @@ from glue.core.message import (DataMessage,
                                )
 from glue.core.state import (GlueSerializer, GlueUnSerializer,
                      saver, loader, VersionedDict)
+from glue.config import session_patch
 
 import anndata
 import scanpy
@@ -212,14 +213,28 @@ class AnnData(Data):
             component_id = ComponentID(label=lbl, parent=self)
             comp_to_add = Component(Xdata)
             self.add_component(comp_to_add,label=component_id)
-        #self._components[component_id] = comp_to_add
-        #self._shape = data.shape
-        #print(f"{self._shape=}")
-        #print(f"{comp_to_add.shape=}")
 
     def attach_subset_listener(self):
         if self.hub is not None:
             self.subset_listener = SubsetListener(self.hub, self)
+
+    def get_kind(self, cid):
+
+        comp = self.get_component(cid)
+
+        try:
+            dtype = comp.dtype
+        except AttributeError: #This will happen for AnnData component
+            return 'numeric'
+
+        if comp.datetime:
+            return 'datetime'
+        elif comp.numeric:
+            return 'numerical'
+        elif comp.categorical:
+            return 'categorical'
+        else:
+            raise TypeError("Unknown data kind")
 
 
 @saver(AnnData, version=1)
@@ -261,21 +276,32 @@ def _save_anndata(data, context):
     return result
 
 
+@session_patch(priority=0)
+def correct_coords_problem(rec):
+    """
+    The default LoadLog incorrectly sets force_coords = True
+    for the anndata_factory (because of an unfortunate
+    coincidence where there are four coordinate components in
+    the full list of coordinate components and X.ndim = 2). 
+
+    We patch the LoadLog here never force_coords
+    """
+    for key, value in rec.items():
+        if key=='LoadLog':
+            value['force_coords'] = False            
+
+
 @loader(AnnData, version=1)
 def _load_anndata(rec, context):
     """
     Custom load function for AnnData.
-    Much of this duplicates _save_data_5 for Data
+    This is the same as the chain of logic in 
+    _save_data_5 for Data, but result is an AnnData object
+    instead.
     """
 
     label = rec['label']
     result = AnnData(label=label)
-
-    # We assume the only regular Component in
-    # an AnnData object is the X array
-    #for icomp, (cid, comp) in enumerate(comps):
-    #    if not isinstance(comp, CoordinateComponent):
-    #        X = comp
 
     # we manually rebuild pixel/world components, so
     # we override this function. This is pretty ugly
@@ -302,7 +328,7 @@ def _load_anndata(rec, context):
 
     coord = [c for c in comps if isinstance(c[1], CoordinateComponent)]
     coord = [x[0] for x in sorted(coord, key=lambda x: x[1])]
-    #import ipdb; ipdb.set_trace()
+
     if getattr(result, 'coords') is not None:
         assert len(coord) == result.ndim * 2
         result._world_component_ids = coord[:len(coord) // 2]
@@ -424,23 +450,6 @@ class DataAnnData(Data):
         return [c for c in self.component_ids() if
                 not isinstance(self._components[c], (DerivedComponent, CoordinateComponent))]
     
-    def get_kind(self, cid):
-    
-        comp = self.get_component(cid)
-        
-        try:
-            dtype = comp.dtype
-        except AttributeError: #This will happen for AnnData component
-            return 'numeric'
-        
-        if comp.datetime:
-            return 'datetime'
-        elif comp.numeric:
-            return 'numerical'
-        elif comp.categorical:
-            return 'categorical'
-        else:
-            raise TypeError("Unknown data kind")
     
     
     def get_data(self, cid, view=None):
