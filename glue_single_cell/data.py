@@ -190,6 +190,21 @@ class SubsetListener(HubListener):
         #print("Message received:")
         #print("{0}".format(message))
 
+class AnnData(Data):
+    def __init__(self, data, label='', **kwargs):
+        super().__init__(label=label, **kwargs)
+        component_id = ComponentID(label='X', parent=self)
+        comp_to_add = Component(data.X)
+        self.add_component(comp_to_add,label=component_id)
+        self._components[component_id] = comp_to_add
+        self._shape = data.shape
+        print(f"{self._shape=}")
+        print(f"{comp_to_add.shape=}")
+
+    def attach_subset_listener(self):
+        if self.hub is not None:
+            self.subset_listener = SubsetListener(self.hub, self)
+
 
 class DataAnnData(Data):
     
