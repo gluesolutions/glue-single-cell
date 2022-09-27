@@ -14,7 +14,7 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from pathlib import Path
-import anndata
+#import anndata
 import scanpy as sc
 
 from .data import DataAnnData, AnnData
@@ -23,6 +23,29 @@ from .qt.load_data import LoadDataDialog
 
 __all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', 'DataAnnDataListener', 'setup_anndata']
 
+class AnnDataListener(HubListener):
+    """
+    Listen for DataAnnData objects to be added to the 
+    data collection object, and, if one is, attach its
+    subset listener and setup the correct join_on_key
+    joins in a way that they will show up in the GUI.
+    """
+    def __init__(self, hub):
+        hub.subscribe(self, DataCollectionAddMessage,
+                      handler=self.setup_anndata)
+    
+    def setup_anndata(self, message):
+        data = message.data
+        dc = message.sender
+        if isinstance(data, AnnData):
+            data.attach_subset_listener()
+            setup_gui_joins(dc, data)
+
+
+@startup_action("setup_anndata")
+def setup_anndata(session, data_collection):
+    data_collection.anndatalistener = AnnDataListener(data_collection.hub)
+    return
 
 def df_to_data(obj, label=None, skip_components=[]):
     result = Data(label=label)
@@ -95,17 +118,11 @@ def join_anndata_on_keys(datasets):
     return datasets
 
 
-#@saver(AnnData, version=1):
-#def _save_anndata(data, context):
-
-#@loader(AnnData, version=1):
-#def _load_anndata(data, context):
-
 @data_factory("New AnnData Loader", is_anndata, priority=1)
 def read_anndata_new(file_name):
     basename = Path(file_name).stem
     adata = sc.read(file_name, sparse=True, backed=False)
-    return AnnData(adata, label=f'{basename}_X')
+    return AnnData(X=adata.X, label=f'{basename}_X')
 
 
 @data_factory('AnnData data loader', is_anndata, priority=999)
@@ -202,26 +219,4 @@ def read_anndata(file_name, skip_dialog=False):
     return join_anndata_on_keys(list_of_data_objs)
 
 
-class AnnDataListener(HubListener):
-    """
-    Listen for DataAnnData objects to be added to the 
-    data collection object, and, if one is, attach its
-    subset listener and setup the correct join_on_key
-    joins in a way that they will show up in the GUI.
-    """
-    def __init__(self, hub):
-        hub.subscribe(self, DataCollectionAddMessage,
-                      handler=self.setup_anndata)
-    
-    def setup_anndata(self, message):
-        data = message.data
-        dc = message.sender
-        if isinstance(data, AnnData):
-            data.attach_subset_listener()
-            setup_gui_joins(dc, data)
-            
 
-@startup_action("setup_anndata")
-def setup_anndata(session, data_collection):
-    data_collection.anndatalistener = AnnDataListener(data_collection.hub)
-    return

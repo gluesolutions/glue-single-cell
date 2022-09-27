@@ -47,11 +47,11 @@ import uuid
 
 import pandas as pd
 import numpy as np
+from collections import OrderedDict
 
 from glue.core.component import Component, CoordinateComponent, DerivedComponent
 from glue.core.data import BaseCartesianData, Data
-from glue.core.component_id import ComponentID, ComponentIDDict
-from glue.core.component_id import ComponentIDList
+from glue.core.component_id import ComponentID, ComponentIDDict, PixelComponentID, ComponentIDList
 
 from glue.core.component_link import ComponentLink, CoordinateComponentLink
 from glue.core.exceptions import IncompatibleAttribute
@@ -68,9 +68,14 @@ from glue.core.message import (DataMessage,
                                 SubsetUpdateMessage,
                                 SubsetDeleteMessage,
                                )
+from glue.core.state import (GlueSerializer, GlueUnSerializer,
+                     saver, loader, VersionedDict)
 
 import anndata
 import scanpy
+
+
+
 
 def get_subset(subset_name, data_collection, app=None, save_to_disk=False):
     """
@@ -138,13 +143,14 @@ class SubsetListener(HubListener):
     """
     A Listener to keep the X array of a DataAnnData
     object updated with the current glue subset
-    definitions
+    definitions. We use this for the keeping the
+    Xdata array up-to-date so that we can use it
+    in some of the plug-ins.
     
-    SubsetMessage define `subset` and `attribute` (for update?) 
     """
     def __init__(self, hub, anndata):
         self.anndata = anndata
-        self.Xdata = anndata.Xdata
+        #self.Xdata = anndata.Xdata
         hub.subscribe(self, SubsetCreateMessage,
                       handler=self.update_subset)
         hub.subscribe(self, SubsetUpdateMessage,
@@ -162,25 +168,27 @@ class SubsetListener(HubListener):
         if subset.data == self.anndata.meta['obs_data']:
             try:
                 obs_mask = subset.to_mask()
-                self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
+                #self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
             except IncompatibleAttribute:
                 pass
         elif subset.data == self.anndata.meta['var_data']:
             try:
                 var_mask = subset.to_mask()
-                self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
+                #self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
             except IncompatibleAttribute:
                 pass
 
     def delete_subset(self, message):
         if subset.data == self.anndata.meta['obs_data']:
             try:
-                self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
+                pass
+                #self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
             except:
                 pass
         elif subset.data == self.anndata.meta['var_data']:
             try:
-                self.Xdata.var.drop(subset.label,axis=1,inplace=True)
+                pass
+                #self.Xdata.var.drop(subset.label,axis=1,inplace=True)
             except:
                 pass
 
@@ -191,20 +199,143 @@ class SubsetListener(HubListener):
         #print("{0}".format(message))
 
 class AnnData(Data):
-    def __init__(self, data, label='', **kwargs):
-        super().__init__(label=label, **kwargs)
-        component_id = ComponentID(label='X', parent=self)
-        comp_to_add = Component(data.X)
-        self.add_component(comp_to_add,label=component_id)
-        self._components[component_id] = comp_to_add
-        self._shape = data.shape
-        print(f"{self._shape=}")
-        print(f"{comp_to_add.shape=}")
+    def __init__(self, label='', coords=None, **kwargs):
+        super().__init__(label=label, coords=None)
+
+        # The normal add_component in Data.__init__
+        # Fails for the X array because it is not
+        # necessarily array like (if sparse)
+        # Or at least Component.autotyped() fails
+        # So here we make it an explicit Component first
+        # assert len(kwargs) == 1 ?
+        for lbl, Xdata in sorted(kwargs.items()):
+            component_id = ComponentID(label=lbl, parent=self)
+            comp_to_add = Component(Xdata)
+            self.add_component(comp_to_add,label=component_id)
+        #self._components[component_id] = comp_to_add
+        #self._shape = data.shape
+        #print(f"{self._shape=}")
+        #print(f"{comp_to_add.shape=}")
 
     def attach_subset_listener(self):
         if self.hub is not None:
             self.subset_listener = SubsetListener(self.hub, self)
 
+
+@saver(AnnData, version=1)
+def _save_anndata(data, context):
+    """
+    Custom save function for AnnData.
+    Much of this duplicates _save_data_5 for Data
+    """
+    result = dict(components=[(context.id(c),
+                             context.id(data.get_component(c)))
+                             for c in data._components],
+                 subsets=[context.id(s) for s in data.subsets],
+                 label=data.label)
+
+    if data.coords is not None:
+        result['coords'] = context.id(data.coords)
+
+    result['style'] = context.do(data.style)
+
+    def save_cid_tuple(cids):
+        return tuple(context.id(cid) for cid in cids)
+
+    result['_key_joins'] = [[context.id(k), save_cid_tuple(v0), save_cid_tuple(v1)]
+                            for k, (v0, v1) in data._key_joins.items()]
+    result['uuid'] = data.uuid
+
+    result['primary_owner'] = [context.id(cid) for cid in data.components if cid.parent is data]
+    # Filter out keys/values that can't be serialized
+    meta_filtered = OrderedDict()
+    for key, value in data.meta.items():
+        try:
+            context.do(key)
+            context.do(value)
+        except GlueSerializeError:
+            continue
+        else:
+            meta_filtered[key] = value
+    result['meta'] = context.do(meta_filtered)
+    return result
+
+
+@loader(AnnData, version=1)
+def _load_anndata(rec, context):
+    """
+    Custom load function for AnnData.
+    Much of this duplicates _save_data_5 for Data
+    """
+
+    label = rec['label']
+    result = AnnData(label=label)
+
+    # We assume the only regular Component in
+    # an AnnData object is the X array
+    #for icomp, (cid, comp) in enumerate(comps):
+    #    if not isinstance(comp, CoordinateComponent):
+    #        X = comp
+
+    # we manually rebuild pixel/world components, so
+    # we override this function. This is pretty ugly
+    result._create_pixel_and_world_components = lambda ndim: None
+
+    comps = [list(map(context.object, [cid, comp]))
+             for cid, comp in rec['components']]
+
+    for icomp, (cid, comp) in enumerate(comps):
+        if isinstance(comp, CoordinateComponent):
+            comp._data = result
+
+            # For backward compatibility, we need to check for cases where
+            # the component ID for the pixel components was not a PixelComponentID
+            # and upgrade it to one. This can be removed once we no longer
+            # support pre-v0.8 session files.
+            if not comp.world and not isinstance(cid, PixelComponentID):
+                cid = PixelComponentID(comp.axis, cid.label, parent=cid.parent)
+                comps[icomp] = (cid, comp)
+
+        result.add_component(comp, cid)
+
+    assert result._world_component_ids == []
+
+    coord = [c for c in comps if isinstance(c[1], CoordinateComponent)]
+    coord = [x[0] for x in sorted(coord, key=lambda x: x[1])]
+    #import ipdb; ipdb.set_trace()
+    if getattr(result, 'coords') is not None:
+        assert len(coord) == result.ndim * 2
+        result._world_component_ids = coord[:len(coord) // 2]
+        result._pixel_component_ids = coord[len(coord) // 2:]
+    else:
+        assert len(coord) == result.ndim
+        result._pixel_component_ids = coord
+
+    # We can now re-generate the coordinate links
+    result._set_up_coordinate_component_links(result.ndim)
+
+    for s in rec['subsets']:
+        result.add_subset(context.object(s))    
+
+    result.style = context.object(rec['style'])
+
+    if 'primary_owner' in rec:
+        for cid in rec['primary_owner']:
+            cid = context.object(cid)
+            cid.parent = result
+    yield result
+
+    def load_cid_tuple(cids):
+        return tuple(context.object(cid) for cid in cids)
+
+    result._key_joins = dict((context.object(k), (load_cid_tuple(v0), load_cid_tuple(v1)))
+                             for k, v0, v1 in rec['_key_joins'])
+    if 'uuid' in rec and rec['uuid'] is not None:
+        result.uuid = rec['uuid']
+    else:
+        result.uuid = str(uuid.uuid4())
+    if 'meta' in rec:
+        result.meta.update(context.object(rec['meta']))
 
 class DataAnnData(Data):
     
