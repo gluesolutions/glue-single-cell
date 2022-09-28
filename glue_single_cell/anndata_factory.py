@@ -17,7 +17,7 @@ from pathlib import Path
 #import anndata
 import scanpy as sc
 
-from .data import DataAnnData, AnnData
+from .data import DataAnnData
 
 from .qt.load_data import LoadDataDialog
 
@@ -37,7 +37,7 @@ class AnnDataListener(HubListener):
     def setup_anndata(self, message):
         data = message.data
         dc = message.sender
-        if isinstance(data, AnnData):
+        if isinstance(data, DataAnnData):
             data.attach_subset_listener()
             setup_gui_joins(dc, data)
 
@@ -137,7 +137,7 @@ def read_anndata(file_name, skip_dialog=True):
         subsample_factor = 1
 
     adata = sc.read(file_name, sparse=True, backed=False)
-    XData = AnnData(Xarray=adata.X, label=f'{basename}_X')
+    XData = DataAnnData(Xarray=adata.X, label=f'{basename}_X')
     XData.meta['orig_filename'] = basename
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
@@ -229,13 +229,6 @@ def old_read_anndata(file_name, skip_dialog=False):
     if subsample:
         adata = sc.pp.subsample(adata, fraction = subsample_factor, copy=True)
 
-    # Get the X array as a special glue Data object
-    XData = AnnData(adata, label=f'{basename}_X')#, filemode=try_backed)
-    XData.meta['orig_filename'] = basename
-    XData.meta['Xdata'] = XData.uuid
-    XData.meta['anndatatype'] = 'X Array'
-    XData.meta['join_on_obs'] = True
-    XData.meta['join_on_var'] = True
     
 
 
