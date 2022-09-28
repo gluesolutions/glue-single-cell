@@ -154,6 +154,8 @@ class TestCellSummary(object):
     def test_wrong_subset(self):
         """
         Test that defining a subset on cells does not crash things
+        (and also that subset definitions on obs to not propagate 
+        to var through the X array).
         """
         d1_adata = self.dc[0].Xdata
         d2_obs = self.dc[5]
@@ -166,7 +168,6 @@ class TestCellSummary(object):
             if subset.data == self.dc[0].meta['var_data']:
                 genesubset = subset
                 genesubset_attributes = subset.attributes
-        import ipdb; ipdb.set_trace()
         data_arr = do_calculation_over_gene_subset(d1_adata, genesubset, calculation='Means')
         assert data_arr is None
 

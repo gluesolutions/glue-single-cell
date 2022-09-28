@@ -239,7 +239,15 @@ class DataAnnData(Data):
     def Xdata(self, value):
         self._Xdata = value
 
-
+    def get_mask(self, subset_state, view=None):
+        """
+        This is a bit of a hack. Because we have join_on_keys on both
+        dimensions of the X array, Data.get_mask() will normally
+        default to trying get_mask_with_key_joins. By not 
+        allowing that we prevent subsets on obs/var arrays traveling
+        through the X array to completely cover var/ob arrays.
+        """
+        return subset_state.to_mask(self,view=view)
         
     def attach_subset_listener(self):
         if self.hub is not None:
