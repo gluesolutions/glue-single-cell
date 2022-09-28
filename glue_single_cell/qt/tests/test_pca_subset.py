@@ -159,13 +159,14 @@ class TestCellSummary(object):
         d2_obs = self.dc[5]
         state = d2_obs.id['cell_type'] == 'T'
 
-        subset_group = self.dc.new_subset_group('T cells',state)
+        subset_group = self.dc.new_subset_group('T cells', state)
         
         # This is what we do in the dialog
         for subset in subset_group.subsets: 
             if subset.data == self.dc[0].meta['var_data']:
                 genesubset = subset
                 genesubset_attributes = subset.attributes
+        import ipdb; ipdb.set_trace()
         data_arr = do_calculation_over_gene_subset(d1_adata, genesubset, calculation='Means')
         assert data_arr is None
 

@@ -46,10 +46,11 @@ import uuid
 
 import pandas as pd
 import numpy as np
+from scipy.sparse import isspmatrix
 from collections import OrderedDict
 
 from glue.core.component import Component, CoordinateComponent, DerivedComponent
-from glue.core.data import BaseCartesianData, Data
+from glue.core.data import BaseCartesianData, Data, Subset
 from glue.core.component_id import ComponentID, ComponentIDDict, PixelComponentID, ComponentIDList
 
 from glue.core.component_link import ComponentLink, CoordinateComponentLink
@@ -68,7 +69,7 @@ from glue.core.message import (DataMessage,
                                 SubsetDeleteMessage,
                                )
 from glue.core.state import (GlueSerializer, GlueUnSerializer,
-                     saver, loader, VersionedDict)
+                                saver, loader, VersionedDict)
 from glue.config import session_patch, data_translator
 
 import anndata
@@ -203,17 +204,23 @@ class SubsetListener(HubListener):
         #print("{0}".format(message))
 
 class DataAnnData(Data):
-    def __init__(self, label='', coords=None, **kwargs):
+    def __init__(self, label='', full_anndata_obj=None, backed=False, coords=None, **kwargs):
         super().__init__(label=label, coords=None)
 
+        self._Xdata = full_anndata_obj
+        self.backed = backed
+        self.sparse = False
+
         # The normal add_component in Data.__init__ fails for a sparse array
-        # because it tries to use autotyped(). We know the only component
-        # should be a 
-        # assert len(kwargs) == 1 ?
+        # because it tries to use autotyped().
         for lbl, Xdata in sorted(kwargs.items()):
             component_id = ComponentID(label=lbl, parent=self)
             comp_to_add = Component(Xdata)
             self.add_component(comp_to_add,label=component_id)
+            if isspmatrix(Xdata):
+                self.sparse = True
+            elif type(Xdata) == anndata._core.sparse_dataset.SparseDataset:
+                self.sparse = True
 
         # When we create this data object, we don't have a hub set up yet,
         # so we can't init the SubsetListener at Data creation time. Instead,
@@ -221,6 +228,19 @@ class DataAnnData(Data):
         # startup_action, and this adds a subset_listener to DataAnnData
         # objects that are added to the data collection.
 
+    @property
+    def Xdata(self):
+        if self._Xdata:
+            return self._Xdata
+        else:
+            return self.get_object(cls=anndata.AnnData)
+
+    @Xdata.setter
+    def Xdata(self, value):
+        self._Xdata = value
+
+
+        
     def attach_subset_listener(self):
         if self.hub is not None:
             self.subset_listener = SubsetListener(self.hub, self)
@@ -253,7 +273,10 @@ class DataAnnData(Data):
         
         We could have get_data return an iterator directly. 
         """
-    
+
+        if not self.backed:
+            return super().get_data(cid, view=view)
+
         if isinstance(cid, ComponentLink):
             return cid.compute(self, view)
 
@@ -495,7 +518,7 @@ class DataAnnDataTranslator:
         need to return a bunch of linked datasets
         (all the logic in read_anndata)
         """
-         return DataAnnData(data.X) 
+        return DataAnnData(data.X) 
 
     def unwrap_components(self, data):
         output_dict = {}
@@ -518,14 +541,14 @@ class DataAnnDataTranslator:
      
         if isinstance(data_or_subset, Subset):
             pass
-        elif isinstance(data_or_subset, AnnData):
+        elif isinstance(data_or_subset, DataAnnData):
             
             obs_glue_data = data_or_subset.meta['obs_data']
             var_glue_data = data_or_subset.meta['var_data']
             obs_data = self.unwrap_components(obs_glue_data)
             var_data = self.unwrap_components(var_glue_data)
 
-            adata = ad.AnnData(data_or_subset['X'], obs=obs_data, var=var_data)
+            adata = anndata.AnnData(data_or_subset['Xarray'], obs=obs_data, var=var_data)
             return adata
         else:
             pass

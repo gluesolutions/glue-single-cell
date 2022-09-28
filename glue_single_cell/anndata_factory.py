@@ -14,7 +14,6 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from pathlib import Path
-#import anndata
 import scanpy as sc
 
 from .data import DataAnnData
@@ -119,7 +118,7 @@ def join_anndata_on_keys(datasets):
 
 
 @data_factory("AnnData Loader", is_anndata, priority=999)
-def read_anndata(file_name, skip_dialog=True):
+def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=False, subsample_factor=1, try_backed=False):
     """
     Use Scanpy/AnnData to read a file from disk
     
@@ -130,14 +129,22 @@ def read_anndata(file_name, skip_dialog=True):
     list_of_data_objs = []
     basename = Path(file_name).stem
 
-    if skip_dialog:
-        skip_components = []
-        subsample = False
-        try_backed = False
-        subsample_factor = 1
+    if try_backed:
+        try:
+            adata = sc.read(file_name, sparse=True, backed=try_backed)
+            backed = True
+        except OSError:
+            adata = sc.read(file_name, sparse=True, backed=False)
+            backed = False
+    else:
+        adata = sc.read(file_name, sparse=True, backed=False)
+        backed = False
 
-    adata = sc.read(file_name, sparse=True, backed=False)
-    XData = DataAnnData(Xarray=adata.X, label=f'{basename}_X')
+    if backed:
+        XData = DataAnnData(Xarray=adata.X, full_anndata_obj=adata, backed=backed, label=f'{basename}_X')
+    else:
+        XData = DataAnnData(Xarray=adata.X, backed=backed, label=f'{basename}_X')
+
     XData.meta['orig_filename'] = basename
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
