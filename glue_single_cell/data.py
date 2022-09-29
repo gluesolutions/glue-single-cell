@@ -75,6 +75,7 @@ from glue.config import session_patch, data_translator
 import anndata
 import scanpy
 
+from pathlib import Path
 
 
 
@@ -425,6 +426,7 @@ def _save_anndata(data, context):
             continue
         else:
             meta_filtered[key] = value
+    meta_filtered['loadlog_skip_dialog'] = True
     result['meta'] = context.do(meta_filtered)
     return result
 
@@ -437,12 +439,61 @@ def correct_coords_problem(rec):
     coincidence where there are four coordinate components in
     the full list of coordinate components and X.ndim = 2). 
 
-    We patch the LoadLog here never force_coords
-    """
-    for key, value in rec.items():
-        if key=='LoadLog':
-            value['force_coords'] = False            
+    We patch the LoadLog here to never have force_coords
+    if we have a DataAnnData object in the session. 
 
+    """
+    do_patch = False
+    for key, value in rec.items():
+        if value['_type'] == 'glue_single_cell.data.DataAnnData':
+            do_patch = True
+    
+    if do_patch:
+        for key, value in rec.items():
+            if 'LoadLog' in key:
+                value['force_coords'] = False            
+
+@session_patch(priority=0)
+def move_metadata_into_load_log(rec):
+    """
+    This is a fragile way to capture
+    the information from the loading dialog for
+    an anndata object.
+
+    We have to associate each LoadLog with the appropriate
+    DataAnnData object to get the proper metadata back from the
+    DataAnNData object into the LoadLog
+
+    TODO: Replace this complicated stuff with a state object
+          on the DataAnnData object or a custom LoadLog that
+          knows how to do this more naturally
+    """
+    all_load_logs = {}
+
+    for key, value in rec.items():
+        if value['_type'] == 'glue_single_cell.data.DataAnnData':
+            load_log_kwargs = {}
+            meta_keywords = value['meta']['contents']
+            for meta_keyword, meta_value in meta_keywords.items():
+                if 'orig_filename' in meta_keyword:
+                    filename = meta_value[4:] # To strip off the leading st__
+                if 'loadlog' in meta_keyword:
+                    clean_keyword = meta_keyword.split('loadlog_')[1]
+                    load_log_kwargs[clean_keyword] = meta_value
+            all_load_logs[filename] = load_log_kwargs
+
+    for key, value in rec.items(): 
+        if 'LoadLog' in key:
+            kwargs = dict(*value['kwargs'])
+            
+            filename = value['path']
+            filename = Path(filename).stem
+            load_log_kwargs = all_load_logs[filename]
+            kwargs.update(load_log_kwargs)
+            #for meta_keyword, meta_value in load_log_kwargs.items():
+            #    value['kwargs'].extend(meta_keyword,meta_value)
+            #print(value['kwargs'])
+            value['kwargs']=[list(kwargs.items())]
 
 @loader(DataAnnData, version=1)
 def _load_anndata(rec, context):

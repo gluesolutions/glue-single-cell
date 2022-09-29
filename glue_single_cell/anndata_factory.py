@@ -118,7 +118,7 @@ def join_anndata_on_keys(datasets):
 
 
 @data_factory("AnnData Loader", is_anndata, priority=999)
-def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=False, subsample_factor=1, try_backed=False):
+def read_anndata(file_name, skip_dialog=False, skip_components=[], subsample=False, subsample_factor=1, try_backed=False):
     """
     Use Scanpy/AnnData to read a file from disk
     
@@ -128,6 +128,17 @@ def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=Fals
     """
     list_of_data_objs = []
     basename = Path(file_name).stem
+
+    if not skip_dialog:
+        with set_cursor_cm(Qt.ArrowCursor):
+            load_dialog = LoadDataDialog(filename = file_name)
+            if load_dialog.exec_():
+                skip_components = load_dialog.skip_components
+                subsample = load_dialog.subsample
+                try_backed = load_dialog.try_backed
+                subsample_factor = load_dialog.subsample_factor
+            else:
+                return []
 
     if try_backed:
         try:
@@ -140,6 +151,10 @@ def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=Fals
         adata = sc.read(file_name, sparse=True, backed=False)
         backed = False
 
+    if subsample:
+        adata = sc.pp.subsample(adata, fraction=subsample_factor, copy=True, random_state=0)
+
+
     if backed:
         XData = DataAnnData(Xarray=adata.X, full_anndata_obj=adata, backed=backed, label=f'{basename}_X')
     else:
@@ -150,6 +165,13 @@ def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=Fals
     XData.meta['anndatatype'] = 'X Array'
     XData.meta['join_on_obs'] = True
     XData.meta['join_on_var'] = True
+
+    # This meta-data is attached to the DataAnnData object so that
+    # We can pass it to LoadLog on save/restore
+    XData.meta['loadlog_skip_components'] = skip_components
+    XData.meta['loadlog_subsample'] = subsample
+    XData.meta['loadlog_subsample_factor'] = subsample_factor
+    XData.meta['loadlog_try_backed'] = try_backed    
 
     list_of_data_objs.append(XData)
 
@@ -198,46 +220,3 @@ def read_anndata(file_name, skip_dialog=True, skip_components=[], subsample=Fals
                 obs_data.add_component(comp,comp_name)
 
     return join_anndata_on_keys(list_of_data_objs)
-
-
-@data_factory('Old AnnData data loader', is_anndata, priority=1)
-def old_read_anndata(file_name, skip_dialog=False):
-    """
-    Use Scanpy/AnnData to read a file from disk
-    
-    Currently supports .loom and .h5ad files, but .loom files
-    are read into memory (anndata library does not support
-    a file-backed mode for them) which may cause memory issues.
-    """
-    list_of_data_objs = []
-    basename = Path(file_name).stem
-
-    if skip_dialog:
-        skip_components = []
-        subsample = False
-        try_backed = False
-        subsample_factor = 1
-    else:
-        with set_cursor_cm(Qt.ArrowCursor):
-            load_dialog = LoadDataDialog(filename = file_name)
-            if load_dialog.exec_():
-                skip_components = load_dialog.skip_components
-                subsample = load_dialog.subsample
-                try_backed = load_dialog.try_backed
-                subsample_factor = load_dialog.subsample_factor
-            else:
-                return []
-        
-    adata = sc.read(file_name, sparse=True, backed=try_backed)#, backed='r+')
-
-    # We could maybe do something better here
-    # https://github.com/scverse/scanpy/issues/987
-    # for now we just subsample on obs/cells
-    if subsample:
-        adata = sc.pp.subsample(adata, fraction = subsample_factor, copy=True)
-
-    
-
-
-
-
