@@ -9,7 +9,43 @@ from glue_single_cell.anndata_factory import read_anndata
 from glue_single_cell.data import DataAnnData
 from glue.core import data_factories as df
 
+import anndata as ad
+
 DATA = os.path.join(os.path.dirname(__file__), 'data')
+
+
+class TestData(object):
+    
+    def get_data(self, try_backed=False):
+        original_anndata = ad.read(os.path.join(DATA,'test_data.h5ad'))
+        # Calling self.app.load_data() here does NOT skip_dialog
+        data = df.load_data(os.path.join(DATA,'test_data.h5ad'), 
+                                  factory=read_anndata, skip_dialog=True, try_backed=try_backed)
+        return (original_anndata, data)
+        
+    def test_anndata_access(self):
+        self.app = GlueApplication()
+        self.session = self.app.session
+        self.hub = self.session.hub
+    
+        self.data_collection = self.session.data_collection
+        original_anndata, data = self.get_data()
+        self.data_collection.append(data)
+
+        assert len(self.data_collection) == 3
+        dd = self.data_collection[0]
+        
+        # The new anndata object is not exactly the same, since we get the obsm and varm arrays mixed
+        assert_array_equal(original_anndata.obs['cell_type'],dd.Xdata.obs['cell_type'])
+        #assert original_anndata.var['gene_stuff'] == dd.Xdata.var['gene_stuff']
+
+class TestDataBacked(TestData):
+    def get_data(self, try_backed=True):
+        original_anndata = ad.read(os.path.join(DATA,'test_data.h5ad'))
+        # Calling self.app.load_data() here does NOT skip_dialog
+        data = df.load_data(os.path.join(DATA,'test_data.h5ad'), 
+                                  factory=read_anndata, skip_dialog=True, try_backed=try_backed)
+        return (original_anndata, data)
 
 class TestAnnDataLoader(object):
 

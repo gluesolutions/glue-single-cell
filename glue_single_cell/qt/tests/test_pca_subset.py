@@ -29,6 +29,7 @@ from ..pca_subset import do_calculation_over_gene_subset, apply_data_arr
 DATA = os.path.join(os.path.dirname(__file__), 'data')
 
 
+
 class TestCellSummary(object):
 
     def setup_method(self, method):
@@ -76,14 +77,15 @@ class TestCellSummary(object):
         s.subset_state = d1_var.id['gene_stuff_0'] > 0
         assert s.to_mask().sum() > 0
 
-    def test_calculation(self):
+    def do_calculation_on_multiple_datasets(self, **kwargs):
+        print(kwargs)
         d1_adata = self.dc[0]
         d1_var = self.dc[1]
 
         s = d1_var.new_subset()
         s.subset_state = d1_var.id['gene_stuff_0'] > 0
 
-        data_arr = do_calculation_over_gene_subset(d1_adata, s, calculation='Means')
+        data_arr = do_calculation_over_gene_subset(d1_adata, s, **kwargs)
         assert len(data_arr) == 100
 
         # Now use the same subset on the other dataset
@@ -93,9 +95,12 @@ class TestCellSummary(object):
         s = d2_var.new_subset()
         s.subset_state = d1_var.id['gene_stuff_0'] > 0
 
-        data_arr = do_calculation_over_gene_subset(d2_adata, s, calculation='Means')
+        data_arr = do_calculation_over_gene_subset(d2_adata, s, **kwargs)
         assert len(data_arr) == 500
 
+    def test_calculation(self, **kwargs):
+        self.do_calculation_on_multiple_datasets(calculation='Means')
+        self.do_calculation_on_multiple_datasets(calculation='Module')
 
     def test_calculation_through_qtl(self):
         """

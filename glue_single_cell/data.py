@@ -523,11 +523,13 @@ class DataAnnDataTranslator:
     def unwrap_components(self, data):
         output_dict = {}
         for cid in data.components:
-            if not isinstance(cid, PixelComponentID):
-                output_dict[cid.label] = data[cid]
-            if isinstance(cid, PixelComponentID):
+            #import ipdb; ipdb.set_trace()
+            if (cid.label == 'obs_names') or (cid.label == 'var_names'):
                 output_index = data[cid]
+            elif not isinstance(cid, PixelComponentID):
+                output_dict[cid.label] = data[cid]
         output_df = pd.DataFrame(output_dict, index=output_index)
+        return output_df
 
     def to_object(self, data_or_subset, attribute=None):
         """
@@ -547,7 +549,6 @@ class DataAnnDataTranslator:
             var_glue_data = data_or_subset.meta['var_data']
             obs_data = self.unwrap_components(obs_glue_data)
             var_data = self.unwrap_components(var_glue_data)
-
             adata = anndata.AnnData(data_or_subset['Xarray'], obs=obs_data, var=var_data)
             return adata
         else:

@@ -28,7 +28,6 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
     """
     adata = data_with_Xarray.Xdata
     raw = False
-    #print("Getting mask...")
     try:
         mask = genesubset.to_mask()
     except IncompatibleAttribute:
@@ -47,27 +46,21 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
         adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
-
-        before_memory = time.perf_counter()
         try:
             adata_sel = adata_sel.to_memory()
         except ValueError:
             pass
-        after_memory = time.perf_counter()
-        print(f"Loaded adata into memory in {after_memory - before_memory:0.2f} seconds", file=open('timing.txt','a'))
+        
         gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
-        before_score = time.perf_counter()
+        import ipdb; ipdb.set_trace()
         try:
             sc.tl.score_genes(adata, gene_list = gene_list)
             data_arr = np.expand_dims(adata.obs['score'],axis=1)
         except ValueError:
             print("No genes found!")
             return None
-        after_score = time.perf_counter()
-        print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
 
     elif calculation == 'Means':
-        import ipdb; ipdb.set_trace()
         if raw:
             adata_sel = adata.raw.X[: , mask]  # This will fail if genesubset is not actually over genes
             if data_with_Xarray.sparse == True:
