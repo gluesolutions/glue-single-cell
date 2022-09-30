@@ -77,7 +77,7 @@ class TestCellSummary(object):
         assert s.to_mask().sum() > 0
 
     def test_calculation(self):
-        d1_adata = self.dc[0].Xdata
+        d1_adata = self.dc[0]
         d1_var = self.dc[1]
 
         s = d1_var.new_subset()
@@ -87,7 +87,7 @@ class TestCellSummary(object):
         assert len(data_arr) == 100
 
         # Now use the same subset on the other dataset
-        d2_adata = self.dc[3].Xdata
+        d2_adata = self.dc[3]
         d2_var = self.dc[4]
 
         s = d2_var.new_subset()
@@ -101,7 +101,7 @@ class TestCellSummary(object):
         """
         Test that defining a subset on a linked third dataset works
         """
-        d1_adata = self.dc[0].Xdata
+        d1_adata = self.dc[0]
         d1_var = self.dc[1]
         qtl = self.dc[6]
         
@@ -112,7 +112,7 @@ class TestCellSummary(object):
         assert len(data_arr) == 100
 
         # Now use the same subset on the other dataset
-        d2_adata = self.dc[3].Xdata
+        d2_adata = self.dc[3]
         d2_var = self.dc[4]
 
         s = d2_var.new_subset()
@@ -125,7 +125,7 @@ class TestCellSummary(object):
         """
         Test that defining a subset on a linked third dataset works
         """
-        d1_adata = self.dc[0].Xdata
+        d1_adata = self.dc[0]
         d1_var = self.dc[1]
         qtl = self.dc[6]
         
@@ -140,7 +140,7 @@ class TestCellSummary(object):
         assert len(data_arr) == 100
 
         # Now use the same subset on the other dataset
-        d2_adata = self.dc[3].Xdata
+        d2_adata = self.dc[3]
         d2_var = self.dc[4]
 
         for subset in subset_group.subsets: 
@@ -157,7 +157,7 @@ class TestCellSummary(object):
         (and also that subset definitions on obs to not propagate 
         to var through the X array).
         """
-        d1_adata = self.dc[0].Xdata
+        d1_adata = self.dc[0]
         d2_obs = self.dc[5]
         state = d2_obs.id['cell_type'] == 'T'
 
@@ -173,7 +173,7 @@ class TestCellSummary(object):
 
 
     def test_adding_to_dataset(self):
-        d1_adata = self.dc[0].Xdata
+        d1_adata = self.dc[0]
         d1_var = self.dc[1]
         d1_obs = self.dc[2] # This is target_dataset
 
@@ -186,3 +186,29 @@ class TestCellSummary(object):
         apply_data_arr(d1_obs, data_arr, "d1", key='Means')
         assert len(d1_obs.components) == 6
 
+class TestCellSummaryBacked(TestCellSummary):
+
+    def setup_method(self, method):
+    
+        d1 = df.load_data(os.path.join(DATA,'test_data.h5ad'), factory=read_anndata, skip_dialog=True, try_backed=True)
+        d2 = df.load_data(os.path.join(DATA,'test_other_data.h5ad'), factory=read_anndata, skip_dialog=True, try_backed=True)
+
+        d3 = Data(gene_id = ['Gene_2','Gene_3','Gene_5','Gene_8','Gene_11','Gene_12'],
+                       qtl = [1,2,3,4,5,5],
+                       label = 'qtl')
+        #self.app = GlueApplication()
+        #self.session = self.app.session
+        #self.hub = self.session.hub
+        self.dc = DataCollection([d1, d2, d3])
+
+        self.dc.append(d1)
+        self.dc.append(d2)
+        # TODO: Implicit indexing of the returned datasets here to get the var
+        #       array is not ideal 
+        mylink = JoinLink(cids1 = [d1[1].id['var_names']], 
+                          cids2 = [d2[1].id['var_names']], data1 = d1[1], data2 = d2[1])
+        self.dc.add_link(mylink)
+
+        qtllink = JoinLink(cids1 = [d1[1].id['var_names']], 
+                           cids2 = [d3.id['gene_id']], data1 = d1[1], data2 = d3)
+        self.dc.add_link(qtllink)

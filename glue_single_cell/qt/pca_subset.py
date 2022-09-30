@@ -23,9 +23,10 @@ import time
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
-def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
+def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 'Means'):
     """
     """
+    adata = data_with_Xarray.Xdata
     raw = False
     #print("Getting mask...")
     try:
@@ -66,21 +67,21 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
         print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
 
     elif calculation == 'Means':
+        import ipdb; ipdb.set_trace()
         if raw:
             adata_sel = adata.raw.X[: , mask]  # This will fail if genesubset is not actually over genes
-            if issparse(adata.raw.X):
+            if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
             else:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
         else:
             adata_sel = adata.X[: , mask]
-            if issparse(adata.X):
+            if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
             else:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
-        #print("Mean calculation finished")
     return data_arr
 
 def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
@@ -192,16 +193,15 @@ class PCASubsetDialog(QtWidgets.QDialog):
         
         for data in self._collect:
             if target_dataset.meta['Xdata'] == data.uuid:
-                Xdata = data
+                data_with_Xarray = data
         
         for subset in self.state.genesubset.subsets:
-            if subset.data == Xdata.meta['var_data']:  #  Find the subset on the genes, assuming we are adding to cell data
+            if subset.data == data_with_Xarray.meta['var_data']:  #  Find the subset on the genes, assuming we are adding to cell data
                 genesubset = subset
                 genesubset_attributes = subset.attributes
         if not genesubset:
             print(f"Selected subset {self.state.genesubset.label} does not seem to define genes in for {self.state.data.label}")
 
-        adata = Xdata.Xdata
         basename = genesubset.label
         
         if self.state.do_means:
@@ -210,9 +210,10 @@ class PCASubsetDialog(QtWidgets.QDialog):
             key = 'PCA'
         elif self.state.do_module:
             key = "Module"
-        data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
+        data_arr = do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = key)
 
         if data_arr is not None:
+        
             apply_data_arr(target_dataset, data_arr, basename, key=key)
             target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
 
