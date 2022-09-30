@@ -13,17 +13,23 @@ Contents:
 
 If installing into a new virtual environment:
 
-`conda create -n single-cell python=3.9`
+`conda create -n single-cell`
 
 `conda activate single-cell`
 
 `conda install -c glueviz glueviz`
 
-`pip install git+https://github.com/gluesolutions/glue-single-cell.git`
-
-Otherwise, the (non-glue) requirements for this package are just `scanpy` and `anndata` so in an environment already running glue the following is all that is required:
+`conda install -c conda-forge -c bioconda gseapy`
 
 `pip install git+https://github.com/gluesolutions/glue-single-cell.git`
+
+Otherwise, the (non-glue) requirements for this package are `scanpy`, `anndata`, and `gseapy` so in an environment already running glue the following is all that is strictly required is:
+
+`pip install git+https://github.com/gluesolutions/glue-single-cell.git`
+
+However, gseapy installation from pip requires a rust compiler, so that installation may require the following conda command:
+
+`conda install -c conda-forge -c bioconda gseapy`
 
 # Usage
 
