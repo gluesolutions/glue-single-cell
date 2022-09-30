@@ -176,8 +176,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
                to the target dataset, so this is what we do.
         
         In order to be able to make changes to the subset on-the-fly we need two things:
-        1) This plug-in establishs a listener for a specific subset and attribute
-        2) We might need to make the calculation faster
+        1) This plug-in establishes a listener for a specific subset and attribute
 
         """
         genesubset = None
