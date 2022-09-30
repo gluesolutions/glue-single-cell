@@ -78,69 +78,6 @@ import scanpy
 from pathlib import Path
 
 
-
-def get_subset(subset_name, data_collection, app=None, save_to_disk=False):
-    """
-    Return a view of the anndata object that corresponds
-    to the desired subset
-    """
-    slice_list,uuid = get_subset_mask(subset_name, data_collection)
-    
-    for dataset in data_collection:
-        try:
-            data_uuid = dataset.meta['Xdata']
-            orig_filename = dataset.meta['orig_filename']
-        except KeyError:
-            return None
-        if isinstance(dataset, DataAnnData) and (data_uuid == uuid):
-            goodsubset = None
-            try:
-                goodsubset = dataset.Xdata[slice_list,:]
-            except IndexError:
-                goodsubset = dataset.Xdata[:,slice_list]
-            if goodsubset:
-                if save_to_disk:
-                    new_filename = f'{orig_filename}_{subset_name.replace(" ","")}.h5ad'
-                    newadata = goodsubset.copy(filename=new_filename) #This creates the file but leaves if open in the original mode
-                    newadata.file.close() #So we close it
-                    goodsubset = app.load_data(new_filename)[0].Xdata #This adds the data to the data_collection and returns a reference to the first/main dataset
-                    #The problem with this approach is that we keep adding new data
-                    #to the data collection every time we update the subset and call
-                    #this function again. We could... delete from the data object and force a reload?
-                    #What does this look like in the case were we do not save to disk?
-                    
-                    
-                    #goodsubset = anndata.read(new_filename,backed='r+') #And reopen it so that it is editable
-                    print(f"Subset is being written to disk as {new_filename}")                
-                else:
-                    print(f"Subset is defined as a slice of the full dataset at {orig_filename}. To save this subset as a new object to disk, re-run this command with save_to_disk=True")    
-                return goodsubset
-                
-def get_subset_mask(subset_name, data_collection):
-    """
-    Get a subset mask for a given subset_name by
-    trying to get the mask for all datasets in the
-    data_collection.
-    """
-    target_subset = None
-    for subset in data_collection.subset_groups:
-        if subset.label == subset_name:
-            target_subset = subset
-    if target_subset == None:
-        print(f"Subset {subset_name} not found. Is this subset defined?")
-        return None
-    for subset_on_data in target_subset.subsets:
-        try:
-            list_of_obs = subset_on_data.to_mask()
-            try:
-                uuid = subset_on_data.data.meta['Xdata']
-            except KeyError:
-                uuid = None
-            return list_of_obs, uuid
-        except IncompatibleAttribute:
-            pass
-
-
 class SubsetListener(HubListener):
     """
     A Listener to keep the X array of a DataAnnData
@@ -151,7 +88,13 @@ class SubsetListener(HubListener):
     
     This seems like a fairly expensive option though
     We should only create an AnnData object when we 
-    need it
+    need it.
+
+    In our new scheme we either recreate the AnnData object
+    (in which case we need to update the obs glue data object)
+    or the anndata object (if on disk) -- but we cannot actually
+    modify the item anyway, so we're going to need a better
+    way to track this.
     
     """
     def __init__(self, hub, anndata):
@@ -174,27 +117,25 @@ class SubsetListener(HubListener):
         if subset.data == self.anndata.meta['obs_data']:
             try:
                 obs_mask = subset.to_mask()
-                #self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
+                self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
             except IncompatibleAttribute:
                 pass
         elif subset.data == self.anndata.meta['var_data']:
             try:
                 var_mask = subset.to_mask()
-                #self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
+                self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
             except IncompatibleAttribute:
                 pass
 
     def delete_subset(self, message):
         if subset.data == self.anndata.meta['obs_data']:
             try:
-                pass
-                #self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
+                self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
             except:
                 pass
         elif subset.data == self.anndata.meta['var_data']:
             try:
-                pass
-                #self.Xdata.var.drop(subset.label,axis=1,inplace=True)
+                self.Xdata.var.drop(subset.label,axis=1,inplace=True)
             except:
                 pass
 

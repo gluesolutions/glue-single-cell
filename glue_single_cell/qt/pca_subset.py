@@ -211,7 +211,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
         elif self.state.do_module:
             key = "Module"
         data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
-        print(f"{data_arr.shape=}")
+
         if data_arr is not None:
             apply_data_arr(target_dataset, data_arr, basename, key=key)
             target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
