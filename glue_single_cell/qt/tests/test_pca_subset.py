@@ -22,12 +22,85 @@ from glue.core.data_collection import DataCollection
 from glue.core import data_factories as df
 from glue.core import Data
 from glue.core.link_helpers import JoinLink
+from glue.app.qt import GlueApplication
+from glue.core.state import GlueUnSerializer
 
 from glue_single_cell.anndata_factory import read_anndata
-from ..pca_subset import do_calculation_over_gene_subset, apply_data_arr
+from ..pca_subset import do_calculation_over_gene_subset, apply_data_arr, PCASubsetDialog
 
 DATA = os.path.join(os.path.dirname(__file__), 'data')
 
+
+class TestCellSummarySession(object):
+
+    def test_session_save_and_restore(self, tmpdir):
+        self.app = GlueApplication()
+        self.session = self.app.session
+        self.hub = self.session.hub
+
+        self.dc = self.session.data_collection
+        d1 = df.load_data(os.path.join(DATA,'test_data.h5ad'), factory=read_anndata, skip_dialog=True)
+        d2 = df.load_data(os.path.join(DATA,'test_other_data.h5ad'), factory=read_anndata, skip_dialog=True)
+
+        d3 = Data(gene_id = ['Gene_2','Gene_3','Gene_5','Gene_8','Gene_11','Gene_12'],
+                       qtl = [1,2,3,4,5,5],
+                       label = 'qtl')
+        self.dc.append(d1)
+        self.dc.append(d2)
+        self.dc.append(d3)
+
+        assert len(self.dc[2].components) == 5
+
+
+        d1_adata = self.dc[0]
+        d1_var = self.dc[1]
+
+        s = self.dc.new_subset_group()
+
+        #s = d1_var.new_subset()
+        s.subset_state = d1_var.id['gene_stuff_0'] > 0
+
+        sumdiag = PCASubsetDialog(self.dc)
+        sumdiag.state.data = self.dc[2]
+        sumdiag.state.genesubset = s
+        sumdiag.state.do_means = True
+        sumdiag.state.do_pca = False
+        sumdiag.state.do_module = False
+
+        sumdiag._apply()
+
+        assert self.dc[2].gene_summary_listener is not None
+        assert len(self.dc[2].components) == 6
+        assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
+        assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
+
+        sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0.6
+
+        assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
+        assert not np.sum(self.dc[2]['Subset 1_Means_0']) < 100 # Check that updating subset changes the result
+
+
+        filename = tmpdir.join('test_anndata_load_session.glu').strpath
+        self.session.application.save_session(filename)
+        with open(filename, 'r') as f:
+            session = f.read()
+
+        state = GlueUnSerializer.loads(session)
+
+        ga = state.object('__main__')
+
+        dc = ga.session.data_collection
+
+        assert len(dc) == 7
+        assert self.dc[2].gene_summary_listener is not None
+        assert len(self.dc[2].components) == 6
+        
+        sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
+
+        assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
+        assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
+
+        ga.close()
 
 
 class TestCellSummary(object):
@@ -190,6 +263,9 @@ class TestCellSummary(object):
         data_arr = do_calculation_over_gene_subset(d1_adata, s, calculation='Means')
         apply_data_arr(d1_obs, data_arr, "d1", key='Means')
         assert len(d1_obs.components) == 6
+
+
+
 
 class TestCellSummaryBacked(TestCellSummary):
 

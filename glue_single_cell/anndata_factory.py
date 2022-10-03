@@ -25,9 +25,9 @@ __all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', '
 class AnnDataListener(HubListener):
     """
     Listen for DataAnnData objects to be added to the 
-    data collection object, and, if one is, attach its
-    subset listener and setup the correct join_on_key
-    joins in a way that they will show up in the GUI.
+    data collection object, and, if one is, setup the
+    correct join_on_key joins in a way that they will
+    show up in the GUI.
     """
     def __init__(self, hub):
         hub.subscribe(self, DataCollectionAddMessage,
@@ -37,7 +37,6 @@ class AnnDataListener(HubListener):
         data = message.data
         dc = message.sender
         if isinstance(data, DataAnnData):
-            data.attach_subset_listener()
             setup_gui_joins(dc, data)
 
 

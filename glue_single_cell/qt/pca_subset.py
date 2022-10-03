@@ -3,6 +3,7 @@ import numpy as np
 from qtpy import QtWidgets
 from echo.qt import autoconnect_callbacks_to_qt
 
+
 from glue.core.subset import MultiOrState
 from glue.utils.qt import load_ui
 from glue.core import Data, Hub, HubListener
@@ -52,7 +53,7 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
             pass
         
         gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         try:
             sc.tl.score_genes(adata, gene_list = gene_list)
             data_arr = np.expand_dims(adata.obs['score'],axis=1)
@@ -91,6 +92,14 @@ def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
             target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
 
 
+#class GeneSummaryListenerState(State):
+#    """
+#    Even though we don't do anything with Callback Properties,
+#    State objects have a few nice properties to help out with
+#    save/restore
+#    """
+
+
 class GeneSummaryListener(HubListener):
     """
     A Listener to keep the new components in target_dataset
@@ -98,30 +107,48 @@ class GeneSummaryListener(HubListener):
     
     SubsetMessage define `subset` and `attribute` (for update?) 
     """
-    def __init__(self, hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata):
+    def __init__(self, hub, target_dataset, genesubset, basename, key, data_with_Xarray):
         self.target_dataset = target_dataset
         self.genesubset = genesubset
-        #self.genesubset_attributes = genesubset_attributes  #We want this to remain fixed
         self.basename = basename
         self.key = key
-        self.adata = adata
+        self.data_with_Xarray = data_with_Xarray
         #hub.subscribe(self, SubsetCreateMessage,
         #              handler=self.update_subset)
         hub.subscribe(self, SubsetUpdateMessage,
                       handler=self.update_subset)
         hub.subscribe(self, SubsetDeleteMessage,
                       handler=self.delete_subset)
+
+    def __gluestate__(self, context):
+        return dict(target_dataset=context.do(self.target_dataset),
+                    genesubset=context.do(self.genesubset),
+                    basename=context.do(self.basename),
+                    key=context.do(self.key),
+                    data_with_Xarray=context.do(self.data_with_Xarray))
     
+    @classmethod
+    def __setgluestate__(cls, rec, context):
+        target_dataset=rec['target_dataset']
+        return cls(target_dataset.hub,
+                   target_dataset,
+                   genesubset=rec['genesubset'],
+                   basename=rec['basename'],
+                   key=rec['key'],
+                   data_with_Xarray=rec['data_with_Xarray'],
+                   )
+
+
     def update_subset(self, message):
         """
         if the subset is the one we care about
         and if the subset still is defined over the correct attributes
-        then we rerun the calculation (split that out of _apply())
+        then we rerun the calculation
         """
         subset = message.subset
         if subset == self.genesubset:
             #if subset.attributes == self.genesubset_attributes:
-            new_data = do_calculation_over_gene_subset(self.adata, self.genesubset, calculation = self.key)
+            new_data = do_calculation_over_gene_subset(self.data_with_Xarray, self.genesubset, calculation = self.key)
             if new_data is not None:
                 mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
                 for x in self.target_dataset.components:  # This is to get the right component ids
@@ -195,7 +222,6 @@ class PCASubsetDialog(QtWidgets.QDialog):
             print(f"Selected subset {self.state.genesubset.label} does not seem to define genes in for {self.state.data.label}")
 
         basename = genesubset.label
-        
         if self.state.do_means:
             key = 'Means'
         elif self.state.do_pca:
@@ -207,7 +233,8 @@ class PCASubsetDialog(QtWidgets.QDialog):
         if data_arr is not None:
         
             apply_data_arr(target_dataset, data_arr, basename, key=key)
-            target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
+            target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset,
+                                                                       genesubset, basename, key, data_with_Xarray)
 
 
     @classmethod

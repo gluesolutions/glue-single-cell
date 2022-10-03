@@ -78,73 +78,6 @@ import scanpy
 from pathlib import Path
 
 
-class SubsetListener(HubListener):
-    """
-    A Listener to keep the X array of a DataAnnData
-    object updated with the current glue subset
-    definitions. We use this for the keeping the
-    Xdata array up-to-date so that we can use it
-    in some of the plug-ins.
-    
-    This seems like a fairly expensive option though
-    We should only create an AnnData object when we 
-    need it.
-
-    In our new scheme we either recreate the AnnData object
-    (in which case we need to update the obs glue data object)
-    or the anndata object (if on disk) -- but we cannot actually
-    modify the item anyway, so we're going to need a better
-    way to track this.
-    
-    """
-    def __init__(self, hub, anndata):
-        self.anndata = anndata
-        #self.Xdata = anndata.Xdata
-        hub.subscribe(self, SubsetCreateMessage,
-                      handler=self.update_subset)
-        hub.subscribe(self, SubsetUpdateMessage,
-                      handler=self.update_subset)
-        hub.subscribe(self, SubsetDeleteMessage,
-                      handler=self.delete_subset)
-
-    def update_subset(self, message):
-        """
-        The trick here is that we want to 
-        react to subsets on the obs and var arrays
-        """
-        
-        subset = message.subset
-        if subset.data == self.anndata.meta['obs_data']:
-            try:
-                obs_mask = subset.to_mask()
-                self.Xdata.obs[subset.label] = obs_mask.astype('int').astype('str')
-            except IncompatibleAttribute:
-                pass
-        elif subset.data == self.anndata.meta['var_data']:
-            try:
-                var_mask = subset.to_mask()
-                self.Xdata.var[subset.label] = var_mask.astype('int').astype('str')
-            except IncompatibleAttribute:
-                pass
-
-    def delete_subset(self, message):
-        if subset.data == self.anndata.meta['obs_data']:
-            try:
-                self.Xdata.obs.drop(subset.label,axis=1,inplace=True)
-            except:
-                pass
-        elif subset.data == self.anndata.meta['var_data']:
-            try:
-                self.Xdata.var.drop(subset.label,axis=1,inplace=True)
-            except:
-                pass
-
-
-    def receive_message(self, message):
-        pass
-        #print("Message received:")
-        #print("{0}".format(message))
-
 class DataAnnData(Data):
     def __init__(self, label='', full_anndata_obj=None, backed=False, coords=None, **kwargs):
         super().__init__(label=label, coords=None)
@@ -190,10 +123,6 @@ class DataAnnData(Data):
         through the X array to completely cover var/ob arrays.
         """
         return subset_state.to_mask(self,view=view)
-        
-    def attach_subset_listener(self):
-        if self.hub is not None:
-            self.subset_listener = SubsetListener(self.hub, self)
 
     def get_kind(self, cid):
 
