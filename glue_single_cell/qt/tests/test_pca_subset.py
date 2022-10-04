@@ -83,7 +83,6 @@ class TestCellSummarySession(object):
         filename = tmpdir.join('test_anndata_load_session.glu').strpath
         self.session.application.save_session(filename)
 
-        import ipdb; ipdb.set_trace()
 
         with open(filename, 'r') as f:
             session = f.read()
@@ -105,8 +104,11 @@ class TestCellSummarySession(object):
 
         assert len(dc[0].listeners) == 1
         assert len(dc[2].components) == 6
+        import ipdb; ipdb.set_trace()
 
         #sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
+        dc.subset_groups[0].subset_state = dc[1].id['gene_stuff_0'] > 0
+
 
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
         assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
@@ -184,7 +186,7 @@ class TestCellSummary(object):
 
     def test_calculation(self, **kwargs):
         self.do_calculation_on_multiple_datasets(calculation='Means')
-        self.do_calculation_on_multiple_datasets(calculation='Module')
+        #self.do_calculation_on_multiple_datasets(calculation='Module')
 
     def test_calculation_through_qtl(self):
         """

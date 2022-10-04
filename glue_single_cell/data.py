@@ -59,7 +59,7 @@ from glue.core.exceptions import IncompatibleAttribute
 from fast_histogram import histogram1d, histogram2d
 
 from glue.core import data_factories as df
-from glue.core import Hub, HubListener
+from glue.core import Hub, HubListener, DataCollection
 
 from glue.core.message import (DataMessage,
                                 DataCollectionMessage,
@@ -417,8 +417,6 @@ def _load_anndata(rec, context):
     # We can now re-generate the coordinate links
     result._set_up_coordinate_component_links(result.ndim)
 
-    for l in rec['listeners']:
-        result.listeners.append(context.object(l))
 
     for s in rec['subsets']:
         result.add_subset(context.object(s))    
@@ -442,6 +440,38 @@ def _load_anndata(rec, context):
         result.uuid = str(uuid.uuid4())
     if 'meta' in rec:
         result.meta.update(context.object(rec['meta']))
+    yield result
+    
+    for l in rec['listeners']:
+        result.listeners.append(context.object(l))
+
+from glue.core.state import _load_data_collection_4, _save_data_collection_4
+
+@saver(DataCollection, version=5)
+def _save_data_collection_5(dc, context):
+    result = _save_data_collection_4(dc, context)
+    return result
+
+@loader(DataCollection, version=5)
+def _load_data_collection_5(rec, context):
+    """
+    Because the hub is not created until after datasets
+    are made, we have to extend this function to 
+    go through all the listeners attached to data 
+    objects and register them to the hub.
+    """
+    
+    result = _load_data_collection_4(rec, context)
+
+    for data in result.data:
+        try:
+            listeners = data.listeners
+            for listener in listeners:
+                listener.register_to_hub(result.hub)
+        except AttributeError:
+            pass
+
+    return result
 
 
 @data_translator(anndata.AnnData)
