@@ -217,5 +217,8 @@ def read_anndata(file_name, skip_dialog=False, skip_components=[], subsample=Fal
             data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
             for comp_name, comp in data_to_add.items():
                 obs_data.add_component(comp,comp_name)
+    
+    #obs_data.meta['xarray_data'] = Xdata
+    #var_data.meta['xarray_data'] = Xdata
 
     return join_anndata_on_keys(list_of_data_objs)

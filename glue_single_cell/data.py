@@ -82,6 +82,8 @@ class DataAnnData(Data):
     def __init__(self, label='', full_anndata_obj=None, backed=False, coords=None, **kwargs):
         super().__init__(label=label, coords=None)
 
+        self.listeners = []
+
         self._Xdata = full_anndata_obj
         self.backed = backed
         self.sparse = False
@@ -271,6 +273,7 @@ def _save_anndata(data, context):
                              context.id(data.get_component(c)))
                              for c in data._components],
                  subsets=[context.id(s) for s in data.subsets],
+                 listeners = [context.id(l) for l in data.listeners],
                  label=data.label)
 
     if data.coords is not None:
@@ -413,6 +416,9 @@ def _load_anndata(rec, context):
 
     # We can now re-generate the coordinate links
     result._set_up_coordinate_component_links(result.ndim)
+
+    for l in rec['listeners']:
+        result.listeners.append(context.object(l))
 
     for s in rec['subsets']:
         result.add_subset(context.object(s))    

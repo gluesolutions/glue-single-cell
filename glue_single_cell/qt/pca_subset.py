@@ -107,12 +107,12 @@ class GeneSummaryListener(HubListener):
     
     SubsetMessage define `subset` and `attribute` (for update?) 
     """
-    def __init__(self, hub, target_dataset, genesubset, basename, key, data_with_Xarray):
-        self.target_dataset = target_dataset
+    def __init__(self, hub, genesubset, basename, key, data_with_Xarray):
+        self.data_with_Xarray = data_with_Xarray
         self.genesubset = genesubset
         self.basename = basename
         self.key = key
-        self.data_with_Xarray = data_with_Xarray
+        self.target_dataset = self.data_with_Xarray.meta['obs_data']
         #hub.subscribe(self, SubsetCreateMessage,
         #              handler=self.update_subset)
         hub.subscribe(self, SubsetUpdateMessage,
@@ -121,21 +121,22 @@ class GeneSummaryListener(HubListener):
                       handler=self.delete_subset)
 
     def __gluestate__(self, context):
-        return dict(target_dataset=context.do(self.target_dataset),
-                    genesubset=context.do(self.genesubset),
-                    basename=context.do(self.basename),
-                    key=context.do(self.key),
-                    data_with_Xarray=context.do(self.data_with_Xarray))
+        
+        return dict(genesubset = context.id(self.genesubset),
+                    basename = context.do(self.basename),
+                    key = context.do(self.key),
+                    data_with_Xarray = context.id(self.data_with_Xarray)
+                )
     
     @classmethod
     def __setgluestate__(cls, rec, context):
-        target_dataset=rec['target_dataset']
-        return cls(target_dataset.hub,
-                   target_dataset,
-                   genesubset=rec['genesubset'],
+        data_with_Xarray= context.object(rec['data_with_Xarray'])
+        #target_dataset = context.object(rec['data_with_Xarray'])
+        return cls(data_with_Xarray.hub,
+                   genesubset=context.object(rec['genesubset']),
                    basename=rec['basename'],
                    key=rec['key'],
-                   data_with_Xarray=rec['data_with_Xarray'],
+                   data_with_Xarray=data_with_Xarray,
                    )
 
 
@@ -233,8 +234,9 @@ class PCASubsetDialog(QtWidgets.QDialog):
         if data_arr is not None:
         
             apply_data_arr(target_dataset, data_arr, basename, key=key)
-            target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset,
-                                                                       genesubset, basename, key, data_with_Xarray)
+            gene_summary_listener = GeneSummaryListener(self._collect.hub, genesubset, 
+                                                                         basename, key, data_with_Xarray)
+            data_with_Xarray.listeners.append(gene_summary_listener)
 
 
     @classmethod

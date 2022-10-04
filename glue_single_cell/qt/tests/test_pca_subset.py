@@ -69,7 +69,7 @@ class TestCellSummarySession(object):
 
         sumdiag._apply()
 
-        assert self.dc[2].gene_summary_listener is not None
+        assert len(self.dc[0].listeners) == 1
         assert len(self.dc[2].components) == 6
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
         assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
@@ -82,6 +82,9 @@ class TestCellSummarySession(object):
 
         filename = tmpdir.join('test_anndata_load_session.glu').strpath
         self.session.application.save_session(filename)
+
+        import ipdb; ipdb.set_trace()
+
         with open(filename, 'r') as f:
             session = f.read()
 
@@ -92,10 +95,18 @@ class TestCellSummarySession(object):
         dc = ga.session.data_collection
 
         assert len(dc) == 7
-        assert self.dc[2].gene_summary_listener is not None
-        assert len(self.dc[2].components) == 6
-        
-        sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
+        ## The problem is that this gene_summary_listener is NOT being saved
+        ## It is attached to a Data object, but only specific parts of a Data
+        ## object are saved/loaded. 
+
+        ## If we attach the gene_summary_listener to the DataAnnData object
+        ## we already have a custom saver/loader for that.
+
+
+        assert len(dc[0].listeners) == 1
+        assert len(dc[2].components) == 6
+
+        #sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
 
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
         assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
