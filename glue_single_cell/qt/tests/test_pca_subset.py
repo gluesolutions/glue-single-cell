@@ -24,6 +24,7 @@ from glue.core import Data
 from glue.core.link_helpers import JoinLink
 from glue.app.qt import GlueApplication
 from glue.core.state import GlueUnSerializer
+from glue.utils.qt import process_events
 
 from glue_single_cell.anndata_factory import read_anndata
 from ..pca_subset import do_calculation_over_gene_subset, apply_data_arr, PCASubsetDialog
@@ -74,6 +75,8 @@ class TestCellSummarySession(object):
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
         assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
 
+        #import ipdb; ipdb.set_trace()
+
         sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0.6
 
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
@@ -104,15 +107,12 @@ class TestCellSummarySession(object):
 
         assert len(dc[0].listeners) == 1
         assert len(dc[2].components) == 6
-        import ipdb; ipdb.set_trace()
 
         #sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
         dc.subset_groups[0].subset_state = dc[1].id['gene_stuff_0'] > 0
 
-
-        assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
-        assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
-
+        assert np.sum(dc[2]['Subset 1_Means_0']) > 99
+        assert np.sum(dc[2]['Subset 1_Means_0']) < 100
         ga.close()
 
 

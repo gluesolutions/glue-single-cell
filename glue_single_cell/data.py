@@ -301,6 +301,9 @@ def _save_anndata(data, context):
             meta_filtered[key] = value
     meta_filtered['loadlog_skip_dialog'] = True
     result['meta'] = context.do(meta_filtered)
+    
+    result['sparse'] = context.do(data.sparse)
+
     return result
 
 
@@ -440,6 +443,8 @@ def _load_anndata(rec, context):
         result.uuid = str(uuid.uuid4())
     if 'meta' in rec:
         result.meta.update(context.object(rec['meta']))
+    
+    result.sparse = context.object(rec['sparse'])
     yield result
     
     for l in rec['listeners']:
@@ -488,7 +493,6 @@ class DataAnnDataTranslator:
     def unwrap_components(self, data):
         output_dict = {}
         for cid in data.components:
-            #import ipdb; ipdb.set_trace()
             if (cid.label == 'obs_names') or (cid.label == 'var_names'):
                 output_index = data[cid]
             elif not isinstance(cid, PixelComponentID):

@@ -53,7 +53,6 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
             pass
         
         gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
-        #import ipdb; ipdb.set_trace()
         try:
             sc.tl.score_genes(adata, gene_list = gene_list)
             data_arr = np.expand_dims(adata.obs['score'],axis=1)
@@ -161,6 +160,7 @@ class GeneSummaryListener(HubListener):
         if subset == self.genesubset:
             #if subset.attributes == self.genesubset_attributes:
             new_data = do_calculation_over_gene_subset(self.data_with_Xarray, self.genesubset, calculation = self.key)
+
             if new_data is not None:
                 mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
                 for x in self.target_dataset.components:  # This is to get the right component ids
@@ -172,7 +172,8 @@ class GeneSummaryListener(HubListener):
                 #print(mapping)
                 #print([type(k) for k in mapping.keys()])
                 self.target_dataset.update_components(mapping)
-    
+                
+
     def delete_subset(self, message):
         """
         Remove the attributes from target_dataset
