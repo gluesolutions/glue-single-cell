@@ -206,7 +206,7 @@ class LoadDataDialog(QDialog):
         skip_components = []
         for idx in range(self.ui.list_component.count()):
             item = self.ui.list_component.item(idx)
-            if item.checkState() != Qt.Checked:
+            if (item.checkState() != Qt.Checked) and (item.foreground() != Qt.gray):
                 skip_components.append(item.text())
         self.skip_components = skip_components
 

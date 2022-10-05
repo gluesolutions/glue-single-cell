@@ -13,6 +13,28 @@ import scanpy as sc
 __all__ = ['DiffGeneExpDialog']
 
 
+def get_gene_list_diff_exp(subset1, subset2, data, n_genes=50):
+
+    adata = data.Xdata
+    obsdata = data.meta['obs_data']
+    conditions = [
+        (obsdata.get_mask(subset1.subset_state)),
+        (obsdata.get_mask(subset2.subset_state))]
+    
+    choices = ['1','2']
+    
+    adata.obs['glue_subsets'] = np.select(conditions, choices, default='0')
+    adata_selected = adata[adata.obs['glue_subsets'] != '0', :]
+    try:
+        adata_selected = adata_selected.to_memory()  # We should check that this is not going to be too large
+    except ValueError:
+        pass
+    sc.tl.rank_genes_groups(adata_selected, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
+
+    gene_list = [x[0] for x in adata_selected.uns['rank_genes_groups']['names']][0:n_genes]
+    
+    return gene_list
+
 class DiffGeneExpDialog(QtWidgets.QDialog):
 
     def __init__(self, collect, default=None, parent=None):
@@ -43,52 +65,19 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         obs array
         
         Note that this copies the relevant subsets into memory as otherwise
-        this won't work on an anndata gile in disk-backed mode:
+        this won't work on anndata in disk-backed mode:
         
         https://github.com/theislab/scanpy/issues/2147
         
         (the above is technically for a different scanpy function, but the same problem occurs for rank_genes_groups)
         """
-        for subset in self.state.subset1.subsets:
-            if subset.data == self.state.data:
-                subset1 = subset
-        for subset in self.state.subset2.subsets:
-            if subset.data == self.state.data:
-                subset2 = subset
-        
-        adata = self.state.data.Xdata
-        
-        vardata = self.state.data.meta['var_data']
-        
-        #mask1 = adata[subset1.label]
-        #mask2 = adata[subset2.label]
-        
-        conditions = [
-            (adata.obs[subset1.label] == '1'),
-            (adata.obs[subset2.label] == '1')]
-        
-        choices = ['1','2']
-        
-        adata.obs['glue_subsets'] = np.select(conditions, choices, default='0')
-         #This could be not well-defined -- but we need both masks in one var -- code mask1 as '1' and mask2 = '2' and everything else as '0'
-        
-        adata_selected = adata[adata.obs['glue_subsets'] != 0, :]
-        try:
-            adata_selected = adata_selected.to_memory()  # We should check that this is not going to be too large
-        except ValueError:
-            pass
-
-        sc.tl.rank_genes_groups(adata_selected, 'glue_subsets', groups=['1'], reference='2', method='wilcoxon')
-        
-        n_genes = 50 #This should be a user-specified input
-        gene_list = [x[0] for x in adata_selected.uns['rank_genes_groups']['names']][0:n_genes]
-
-        print(gene_list)
+        gene_list = get_gene_list_diff_exp(self.state.subset1, self.state.subset2, self.state.data, n_genes=50)
         state_list = []
+        vardata = self.state.data.meta['var_data']
         for gene in gene_list:
             state_list.append(vardata.id[self.state.gene_att] == gene)
         final_state = MultiOrState(state_list)
-        self.state.data_collection.new_subset_group(f'DGE between {subset1.label} and {subset2.label}', final_state)
+        self.state.data_collection.new_subset_group(f'DGE between {self.state.subset1.label} and {self.state.subset2.label}', final_state)
 
     @classmethod
     def create_subset(cls, collect, default=None, parent=None):

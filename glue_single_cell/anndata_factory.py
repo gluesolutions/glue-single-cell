@@ -3,6 +3,7 @@ from glue.config import startup_action
 
 from glue.core import Data
 from glue.core import DataCollection
+
 from glue.core.message import DataCollectionAddMessage
 from glue.core import Hub, HubListener
 from glue.core.qt.dialogs import warn
@@ -13,7 +14,6 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from pathlib import Path
-import anndata
 import scanpy as sc
 
 from .data import DataAnnData
@@ -22,6 +22,28 @@ from .qt.load_data import LoadDataDialog
 
 __all__ = ['df_to_data', 'is_anndata', 'join_anndata_on_keys', 'read_anndata', 'DataAnnDataListener', 'setup_anndata']
 
+class AnnDataListener(HubListener):
+    """
+    Listen for DataAnnData objects to be added to the 
+    data collection object, and, if one is, setup the
+    correct join_on_key joins in a way that they will
+    show up in the GUI.
+    """
+    def __init__(self, hub):
+        hub.subscribe(self, DataCollectionAddMessage,
+                      handler=self.setup_anndata)
+    
+    def setup_anndata(self, message):
+        data = message.data
+        dc = message.sender
+        if isinstance(data, DataAnnData):
+            setup_gui_joins(dc, data)
+
+
+@startup_action("setup_anndata")
+def setup_anndata(session, data_collection):
+    data_collection.anndatalistener = AnnDataListener(data_collection.hub)
+    return
 
 def df_to_data(obj, label=None, skip_components=[]):
     result = Data(label=label)
@@ -94,10 +116,10 @@ def join_anndata_on_keys(datasets):
     return datasets
 
 
-@data_factory('AnnData data loader', is_anndata, priority=999)
-def read_anndata(file_name, skip_dialog=False):
+@data_factory("AnnData Loader", is_anndata, priority=999)
+def read_anndata(file_name, skip_dialog=False, skip_components=[], subsample=False, subsample_factor=1, try_backed=False):
     """
-    Use AnnData to read a file from disk
+    Use Scanpy/AnnData to read a file from disk
     
     Currently supports .loom and .h5ad files, but .loom files
     are read into memory (anndata library does not support
@@ -106,12 +128,7 @@ def read_anndata(file_name, skip_dialog=False):
     list_of_data_objs = []
     basename = Path(file_name).stem
 
-    if skip_dialog:
-        skip_components = []
-        subsample = False
-        try_backed = False
-        subsample_factor = 1
-    else:
+    if not skip_dialog:
         with set_cursor_cm(Qt.ArrowCursor):
             load_dialog = LoadDataDialog(filename = file_name)
             if load_dialog.exec_():
@@ -121,25 +138,42 @@ def read_anndata(file_name, skip_dialog=False):
                 subsample_factor = load_dialog.subsample_factor
             else:
                 return []
-        
-    adata = sc.read(file_name, sparse=True, backed=try_backed)#, backed='r+')
 
-    # We could maybe do something better here
-    # https://github.com/scverse/scanpy/issues/987
-    # for now we just subsample on obs/cells
+    if try_backed:
+        try:
+            adata = sc.read(file_name, sparse=True, backed=try_backed)
+            backed = True
+        except OSError:
+            adata = sc.read(file_name, sparse=True, backed=False)
+            backed = False
+    else:
+        adata = sc.read(file_name, sparse=True, backed=False)
+        backed = False
+
     if subsample:
-        adata = sc.pp.subsample(adata, fraction = subsample_factor, copy=True)
+        adata = sc.pp.subsample(adata, fraction=subsample_factor, copy=True, random_state=0)
 
-    # Get the X array as a special glue Data object
-    XData = DataAnnData(adata, label=f'{basename}_X', filemode=try_backed)
+
+    if backed:
+        XData = DataAnnData(Xarray=adata.X, full_anndata_obj=adata, backed=backed, label=f'{basename}_X')
+    else:
+        XData = DataAnnData(Xarray=adata.X, backed=backed, label=f'{basename}_X')
+
     XData.meta['orig_filename'] = basename
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
     XData.meta['join_on_obs'] = True
     XData.meta['join_on_var'] = True
-    
+
+    # This meta-data is attached to the DataAnnData object so that
+    # We can pass it to LoadLog on save/restore
+    XData.meta['loadlog_skip_components'] = skip_components
+    XData.meta['loadlog_subsample'] = subsample
+    XData.meta['loadlog_subsample_factor'] = subsample_factor
+    XData.meta['loadlog_try_backed'] = try_backed    
+
     list_of_data_objs.append(XData)
-    
+
     # The var array is all components of the same length
     # and is stored by AnnData as a Pandas DataFrame
     try:
@@ -154,15 +188,14 @@ def read_anndata(file_name, skip_dialog=False):
         list_of_data_objs.append(var_data)
     except:
         pass
-    
+
     for key in adata.varm_keys():
         if key not in skip_components:
             data_arr = adata.varm[key]
             data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
             for comp_name, comp in data_to_add.items():
                 var_data.add_component(comp,comp_name)
-    
-    
+
     # The obs array is all components of the same length
     # and is stored by AnnData as a Pandas DataFrame
     try:
@@ -184,30 +217,8 @@ def read_anndata(file_name, skip_dialog=False):
             data_to_add = {f'{key}_{i}':k for i,k in enumerate(data_arr.T)}
             for comp_name, comp in data_to_add.items():
                 obs_data.add_component(comp,comp_name)
+    
+    #obs_data.meta['xarray_data'] = Xdata
+    #var_data.meta['xarray_data'] = Xdata
 
     return join_anndata_on_keys(list_of_data_objs)
-
-
-class DataAnnDataListener(HubListener):
-    """
-    Listen for DataAnnData objects to be added to the 
-    data collection object, and, if one is, attach its
-    subset listener and setup the correct join_on_key
-    joins in a way that they will show up in the GUI.
-    """
-    def __init__(self, hub):
-        hub.subscribe(self, DataCollectionAddMessage,
-                      handler=self.setup_anndata)
-    
-    def setup_anndata(self, message):
-        data = message.data
-        dc = message.sender
-        if isinstance(data, DataAnnData):
-            data.attach_subset_listener()
-            setup_gui_joins(dc, data)
-            
-
-@startup_action("setup_anndata")
-def setup_anndata(session, data_collection):
-    data_collection.anndatalistener = DataAnnDataListener(data_collection.hub)
-    return

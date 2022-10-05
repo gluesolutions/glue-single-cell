@@ -3,6 +3,7 @@ import numpy as np
 from qtpy import QtWidgets
 from echo.qt import autoconnect_callbacks_to_qt
 
+
 from glue.core.subset import MultiOrState
 from glue.utils.qt import load_ui
 from glue.core import Data, Hub, HubListener
@@ -23,11 +24,11 @@ import time
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
-def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
+def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 'Means'):
     """
     """
+    adata = data_with_Xarray.Xdata
     raw = False
-    #print("Getting mask...")
     try:
         mask = genesubset.to_mask()
     except IncompatibleAttribute:
@@ -46,41 +47,34 @@ def do_calculation_over_gene_subset(adata, genesubset, calculation = 'Means'):
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
         adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
-
-        before_memory = time.perf_counter()
         try:
             adata_sel = adata_sel.to_memory()
         except ValueError:
             pass
-        after_memory = time.perf_counter()
-        print(f"Loaded adata into memory in {after_memory - before_memory:0.2f} seconds", file=open('timing.txt','a'))
+        
         gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
-        before_score = time.perf_counter()
         try:
             sc.tl.score_genes(adata, gene_list = gene_list)
             data_arr = np.expand_dims(adata.obs['score'],axis=1)
         except ValueError:
             print("No genes found!")
             return None
-        after_score = time.perf_counter()
-        print(f"Calculated score in {after_score - before_score:0.2f} seconds", file=open('timing.txt','a'))
 
     elif calculation == 'Means':
         if raw:
             adata_sel = adata.raw.X[: , mask]  # This will fail if genesubset is not actually over genes
-            if issparse(adata.raw.X):
+            if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
             else:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
         else:
             adata_sel = adata.X[: , mask]
-            if issparse(adata.X):
+            if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA
             else:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
-        #print("Mean calculation finished")
     return data_arr
 
 def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
@@ -97,6 +91,14 @@ def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
             target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
 
 
+#class GeneSummaryListenerState(State):
+#    """
+#    Even though we don't do anything with Callback Properties,
+#    State objects have a few nice properties to help out with
+#    save/restore
+#    """
+
+
 class GeneSummaryListener(HubListener):
     """
     A Listener to keep the new components in target_dataset
@@ -104,30 +106,61 @@ class GeneSummaryListener(HubListener):
     
     SubsetMessage define `subset` and `attribute` (for update?) 
     """
-    def __init__(self, hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata):
-        self.target_dataset = target_dataset
+    def __init__(self, genesubset, basename, key, data_with_Xarray=None):
         self.genesubset = genesubset
-        #self.genesubset_attributes = genesubset_attributes  #We want this to remain fixed
         self.basename = basename
         self.key = key
-        self.adata = adata
+        if data_with_Xarray is not None:
+            self.set_circular_refs(data_with_Xarray)
+
+    def set_circular_refs(self, data_with_Xarray):
+        self.data_with_Xarray = data_with_Xarray
+        self.hub = data_with_Xarray.hub
+        self.target_dataset = self.data_with_Xarray.meta['obs_data']
+
+    def register_to_hub(self, hub=None):
+        if hub is not None:
+            self.hub = hub
+        if self.hub is None:
+            self.hub = self.data_with_Xarray.hub
         #hub.subscribe(self, SubsetCreateMessage,
         #              handler=self.update_subset)
-        hub.subscribe(self, SubsetUpdateMessage,
+        self.hub.subscribe(self, SubsetUpdateMessage,
                       handler=self.update_subset)
-        hub.subscribe(self, SubsetDeleteMessage,
+        self.hub.subscribe(self, SubsetDeleteMessage,
                       handler=self.delete_subset)
+
+    def __gluestate__(self, context):
+        
+        return dict(genesubset = context.id(self.genesubset),
+                    basename = context.do(self.basename),
+                    key = context.do(self.key),
+                    data_with_Xarray = context.id(self.data_with_Xarray)
+                )
     
+    @classmethod
+    def __setgluestate__(cls, rec, context):
+        #target_dataset = context.object(rec['data_with_Xarray'])
+        result =  cls(genesubset=context.object(rec['genesubset']),
+                   basename=context.object(rec['basename']),
+                   key=context.object(rec['key']),
+                   )
+        yield result
+        data_with_Xarray = context.object(rec['data_with_Xarray'])
+        result.set_circular_refs(data_with_Xarray)
+        #result.register_to_hub()
+
     def update_subset(self, message):
         """
         if the subset is the one we care about
         and if the subset still is defined over the correct attributes
-        then we rerun the calculation (split that out of _apply())
+        then we rerun the calculation
         """
         subset = message.subset
         if subset == self.genesubset:
             #if subset.attributes == self.genesubset_attributes:
-            new_data = do_calculation_over_gene_subset(self.adata, self.genesubset, calculation = self.key)
+            new_data = do_calculation_over_gene_subset(self.data_with_Xarray, self.genesubset, calculation = self.key)
+
             if new_data is not None:
                 mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
                 for x in self.target_dataset.components:  # This is to get the right component ids
@@ -139,7 +172,8 @@ class GeneSummaryListener(HubListener):
                 #print(mapping)
                 #print([type(k) for k in mapping.keys()])
                 self.target_dataset.update_components(mapping)
-    
+                
+
     def delete_subset(self, message):
         """
         Remove the attributes from target_dataset
@@ -182,8 +216,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
                to the target dataset, so this is what we do.
         
         In order to be able to make changes to the subset on-the-fly we need two things:
-        1) This plug-in establishs a listener for a specific subset and attribute
-        2) We might need to make the calculation faster
+        1) This plug-in establishes a listener for a specific subset and attribute
 
         """
         genesubset = None
@@ -192,29 +225,30 @@ class PCASubsetDialog(QtWidgets.QDialog):
         
         for data in self._collect:
             if target_dataset.meta['Xdata'] == data.uuid:
-                Xdata = data
+                data_with_Xarray = data
         
         for subset in self.state.genesubset.subsets:
-            if subset.data == Xdata.meta['var_data']:  #  Find the subset on the genes, assuming we are adding to cell data
+            if subset.data == data_with_Xarray.meta['var_data']:  #  Find the subset on the genes, assuming we are adding to cell data
                 genesubset = subset
                 genesubset_attributes = subset.attributes
         if not genesubset:
             print(f"Selected subset {self.state.genesubset.label} does not seem to define genes in for {self.state.data.label}")
 
-        adata = Xdata.Xdata
         basename = genesubset.label
-        
         if self.state.do_means:
             key = 'Means'
         elif self.state.do_pca:
             key = 'PCA'
         elif self.state.do_module:
             key = "Module"
-        data_arr = do_calculation_over_gene_subset(adata, genesubset, calculation = key)
-        print(f"{data_arr.shape=}")
+        data_arr = do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = key)
+
         if data_arr is not None:
+        
             apply_data_arr(target_dataset, data_arr, basename, key=key)
-            target_dataset.gene_summary_listener = GeneSummaryListener(self._collect.hub, target_dataset, genesubset, genesubset_attributes, basename, key, adata)
+            gene_summary_listener = GeneSummaryListener(genesubset, basename, key, data_with_Xarray)
+            gene_summary_listener.register_to_hub()
+            data_with_Xarray.listeners.append(gene_summary_listener)
 
 
     @classmethod
