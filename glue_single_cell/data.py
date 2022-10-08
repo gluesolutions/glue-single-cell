@@ -364,12 +364,15 @@ def move_metadata_into_load_log(rec):
             
             filename = value['path']
             filename = Path(filename).stem
-            load_log_kwargs = all_load_logs[filename]
-            kwargs.update(load_log_kwargs)
-            #for meta_keyword, meta_value in load_log_kwargs.items():
-            #    value['kwargs'].extend(meta_keyword,meta_value)
-            #print(value['kwargs'])
-            value['kwargs']=[list(kwargs.items())]
+            try:
+                load_log_kwargs = all_load_logs[filename]
+                kwargs.update(load_log_kwargs)
+                #for meta_keyword, meta_value in load_log_kwargs.items():
+                #    value['kwargs'].extend(meta_keyword,meta_value)
+                #print(value['kwargs'])
+                value['kwargs']=[list(kwargs.items())]
+            except KeyError:
+                pass
 
 @loader(DataAnnData, version=1)
 def _load_anndata(rec, context):
