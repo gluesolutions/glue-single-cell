@@ -75,8 +75,6 @@ class TestCellSummarySession(object):
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
         assert np.sum(self.dc[2]['Subset 1_Means_0']) < 100
 
-        #import ipdb; ipdb.set_trace()
-
         sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0.6
 
         assert np.sum(self.dc[2]['Subset 1_Means_0']) > 99
@@ -164,7 +162,6 @@ class TestCellSummary(object):
         assert s.to_mask().sum() > 0
 
     def do_calculation_on_multiple_datasets(self, **kwargs):
-        print(kwargs)
         d1_adata = self.dc[0]
         d1_var = self.dc[1]
 
@@ -186,6 +183,8 @@ class TestCellSummary(object):
 
     def test_calculation(self, **kwargs):
         self.do_calculation_on_multiple_datasets(calculation='Means')
+        # If Module and backed mode we get this error
+        #https://github.com/scverse/scanpy/issues/2153
         #self.do_calculation_on_multiple_datasets(calculation='Module')
 
     def test_calculation_through_qtl(self):

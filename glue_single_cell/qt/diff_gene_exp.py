@@ -3,7 +3,7 @@ import numpy as np
 from qtpy import QtWidgets
 from echo.qt import autoconnect_callbacks_to_qt
 
-from glue.core.subset import MultiOrState
+from glue.core.subset import CategorySubsetState 
 from glue.utils.qt import load_ui
 
 from ..state import DiffGeneExpState
@@ -72,12 +72,15 @@ class DiffGeneExpDialog(QtWidgets.QDialog):
         (the above is technically for a different scanpy function, but the same problem occurs for rank_genes_groups)
         """
         gene_list = get_gene_list_diff_exp(self.state.subset1, self.state.subset2, self.state.data, n_genes=50)
-        state_list = []
         vardata = self.state.data.meta['var_data']
-        for gene in gene_list:
-            state_list.append(vardata.id[self.state.gene_att] == gene)
-        final_state = MultiOrState(state_list)
-        self.state.data_collection.new_subset_group(f'DGE between {self.state.subset1.label} and {self.state.subset2.label}', final_state)
+        all_indices = []
+        for gene in gene_list: # There is probably a more efficient way to get the codes for certain categories
+            matching_indices = np.where(vardata[self.state.gene_att] == gene)
+            all_indices.extend(list(matching_indices[0]))
+        gene_codes = vardata[self.state.gene_att][all_indices].codes
+        gene_state = CategorySubsetState(att=vardata.id[self.state.gene_att],
+                                         categories=gene_codes)
+        self.state.data_collection.new_subset_group(f'DGE between {self.state.subset1.label} and {self.state.subset2.label}', gene_state)
 
     @classmethod
     def create_subset(cls, collect, default=None, parent=None):
