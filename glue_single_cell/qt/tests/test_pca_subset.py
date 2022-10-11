@@ -25,6 +25,7 @@ from glue.core.link_helpers import JoinLink
 from glue.app.qt import GlueApplication
 from glue.core.state import GlueUnSerializer
 from glue.utils.qt import process_events
+from unittest.mock import patch
 
 from glue_single_cell.anndata_factory import read_anndata
 from ..pca_subset import do_calculation_over_gene_subset, apply_data_arr, PCASubsetDialog
@@ -67,8 +68,9 @@ class TestCellSummarySession(object):
         sumdiag.state.do_means = True
         sumdiag.state.do_pca = False
         sumdiag.state.do_module = False
-
-        sumdiag._apply()
+    
+        with patch('glue_single_cell.qt.pca_subset.dialog') as fakedialog:
+            sumdiag._apply()
 
         assert len(self.dc[0].listeners) == 1
         assert len(self.dc[2].components) == 6
@@ -258,7 +260,8 @@ class TestCellSummary(object):
             if subset.data == self.dc[0].meta['var_data']:
                 genesubset = subset
                 genesubset_attributes = subset.attributes
-        data_arr = do_calculation_over_gene_subset(d1_adata, genesubset, calculation='Means')
+        with patch('glue_single_cell.qt.pca_subset.dialog') as fakedialog:
+            data_arr = do_calculation_over_gene_subset(d1_adata, genesubset, calculation='Means')
         assert data_arr is None
 
 

@@ -16,6 +16,7 @@ from glue.core.exceptions import IncompatibleAttribute
 
 from ..state import PCASubsetState
 from ..anndata_factory import df_to_data
+from qtpy.QtWidgets import QMessageBox
 
 import scanpy as sc
 from scipy.sparse import issparse
@@ -24,14 +25,29 @@ import time
 __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
+def dialog(title, text, icon):
+    if icon=='warn':
+        icon = QMessageBox.Warning
+    elif icon=='info':
+        icon = QMessageBox.Information
+    info = QMessageBox()
+    info.setIcon(icon)
+    info.setText(title)
+    info.setInformativeText(text)
+    info.setStandardButtons(info.Ok)
+    result = info.exec_()
+    return True
+
+
 def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 'Means'):
     """
     """
     adata = data_with_Xarray.Xdata
     raw = False
-    try:
+    try: 
         mask = genesubset.to_mask()
     except IncompatibleAttribute:
+        dialog('Failed', "Failed to generate a mask on the selected subset.", 'warn')
         print("Failed!") # TODO: Present a dialog box for this!
         return None
     if mask.sum() == 0:
@@ -81,22 +97,17 @@ def apply_data_arr(target_dataset, data_arr, basename, key='PCA'):
     """
     This is a sort of clunky approach to doing this.
 
-    We generate a Data object from the data_arr that was returned
-    But they we have to exclude the pixel coordinates
+    We generate a Data object from the data_arr that was returned,
+    and then add the non-coordinate components of this Data object
+    to the target dataset. 
     """
     
     data = Data(**{f'{key}_{i}':k for i,k in enumerate(data_arr.T)},label=f'{basename}_{key}')
     for x in data.components:
-        if x not in data.coordinate_components: 
-            target_dataset.add_component(data.get_component(f'{x}'),f'{basename}_{x}')
-
-
-#class GeneSummaryListenerState(State):
-#    """
-#    Even though we don't do anything with Callback Properties,
-#    State objects have a few nice properties to help out with
-#    save/restore
-#    """
+        if x not in data.coordinate_components:
+            new_comp_name = f'{basename}_{x}'
+            target_dataset.add_component(data.get_component(f'{x}'), new_comp_name)
+    return new_comp_name #This just gets the last one, which is not quite correct for PCA
 
 
 class GeneSummaryListener(HubListener):
@@ -153,8 +164,10 @@ class GeneSummaryListener(HubListener):
     def update_subset(self, message):
         """
         if the subset is the one we care about
-        and if the subset still is defined over the correct attributes
-        then we rerun the calculation
+        then we rerun the calculation.
+
+        TODO: If the subset is the same subset and has just been
+        renamed then we need to update the component name
         """
         subset = message.subset
         if subset == self.genesubset:
@@ -165,12 +178,8 @@ class GeneSummaryListener(HubListener):
                 mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
                 for x in self.target_dataset.components:  # This is to get the right component ids
                     xstr = f'{x.label}'
-                    #print(xstr)
                     if xstr in mapping.keys():
                         mapping[x] = mapping.pop(xstr)
-                        #del mapping[x.label]
-                #print(mapping)
-                #print([type(k) for k in mapping.keys()])
                 self.target_dataset.update_components(mapping)
                 
 
@@ -182,8 +191,6 @@ class GeneSummaryListener(HubListener):
         
     def receive_message(self, message):
         pass
-        #print("Message received:")
-        #print("{0}".format(message))
 
 class PCASubsetDialog(QtWidgets.QDialog):
 
@@ -207,17 +214,9 @@ class PCASubsetDialog(QtWidgets.QDialog):
 
     def _apply(self):
         """
-        1. Take a gene subset of anndata object (load into memory?)
-        2. Calculate some summary statistic on this subset of genes
-        3. Store these values into the data somehow.
-            a. If we put them into the existing AnnData object we will overwrite any existing PCAs
-            b. We could return a new data object linked to the other data
-            c. But the desire is to color-code e.g. a UMAP figure by these new values, which requires appending new attributes
-               to the target dataset, so this is what we do.
-        
-        In order to be able to make changes to the subset on-the-fly we need two things:
-        1) This plug-in establishes a listener for a specific subset and attribute
-
+        Apply the appropriate calculation over the X array for the
+        gene susbset, add the result to the target dataset and 
+        add a GeneSummaryListener to keep that up-to-date.
         """
         genesubset = None
         
@@ -245,11 +244,18 @@ class PCASubsetDialog(QtWidgets.QDialog):
 
         if data_arr is not None:
         
-            apply_data_arr(target_dataset, data_arr, basename, key=key)
+            new_comp_name = apply_data_arr(target_dataset, data_arr, basename, key=key)
             gene_summary_listener = GeneSummaryListener(genesubset, basename, key, data_with_Xarray)
             gene_summary_listener.register_to_hub()
             data_with_Xarray.listeners.append(gene_summary_listener)
 
+        confirm = dialog('Adding a new component',
+                        f'The component:\n'
+                        f'{new_comp_name}\n'
+                        f'has been added to:\n'
+                        f'{target_dataset.label}\n'   
+                        f'and will be automatically updated when {genesubset.label} is changed.',
+                        'info')
 
     @classmethod
     def summarize(cls, collect, default=None, parent=None):
