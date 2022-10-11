@@ -5,6 +5,6 @@ def setup():
     from .menubar_plugin import pca_subset_exp_plugin  # noqa
     from .menubar_plugin import gseapy_plugin # noqa
     from .qtl_viewer.viewer import QTLViewer # noqa
-    
+
     from glue.config import qt_client
     qt_client.add(QTLViewer)

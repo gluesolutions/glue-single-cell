@@ -13,9 +13,10 @@ from glue.core.message import (SubsetMessage,
                                SubsetDeleteMessage,
                                )
 from glue.core.exceptions import IncompatibleAttribute
-from qtpy.QtWidgets import QMessageBox
+
 from ..state import PCASubsetState
 from ..anndata_factory import df_to_data
+from qtpy.QtWidgets import QMessageBox
 
 import scanpy as sc
 from scipy.sparse import issparse
@@ -25,6 +26,10 @@ __all__ = ['PCASubsetDialog','GeneSummaryListener']
 
 
 def dialog(title, text, icon):
+    if icon=='warn':
+        icon = QMessageBox.Warning
+    elif icon=='info':
+        icon = QMessageBox.Information
     info = QMessageBox()
     info.setIcon(icon)
     info.setText(title)
@@ -32,6 +37,7 @@ def dialog(title, text, icon):
     info.setStandardButtons(info.Ok)
     result = info.exec_()
     return True
+
 
 def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 'Means'):
     """
@@ -41,7 +47,7 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
     try: 
         mask = genesubset.to_mask()
     except IncompatibleAttribute:
-        dialog('Failed',"Failed to generate a mask on the selected subset.", QMessageBox.Warning)
+        dialog('Failed', "Failed to generate a mask on the selected subset.", 'warn')
         print("Failed!") # TODO: Present a dialog box for this!
         return None
     if mask.sum() == 0:
@@ -255,7 +261,7 @@ class PCASubsetDialog(QtWidgets.QDialog):
                         f'has been added to:\n'
                         f'{target_dataset.label}\n'   
                         f'and will be automatically updated when {genesubset.label} is changed.',
-                        QMessageBox.Information)
+                        'info')
 
     @classmethod
     def summarize(cls, collect, default=None, parent=None):
