@@ -5,7 +5,9 @@ import pandas as pd
 
 from glue.utils.qt import load_ui
 
+from ..anndata_factory import df_to_data
 from ..state import GSEApyState
+from .pca_subset import dialog
 
 import gseapy
 
@@ -46,7 +48,7 @@ class GSEApyDialog(QtWidgets.QDialog):
         self.ui.button_ok.clicked.connect(self.accept)
         self.ui.button_cancel.clicked.connect(self.reject)
 
-    def _apply(self):
+    def _apply(self, do_dialog=True):
         """
         """
         if self.state.subset is not None:
@@ -57,9 +59,27 @@ class GSEApyDialog(QtWidgets.QDialog):
         gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list] Maybe just for humans?
         output = gseapy.enrichr(gene_list=gene_list_upper, description='pathway', organism='mouse', # Should be an option as well
                              gene_sets=self.state.gene_set, no_plot=True)
+        new_name = f'{self.state.gene_set} for {self.state.subset.label}'
+        results_data = df_to_data(output.results,label=new_name)
+        # Output.results has Pandas Object types which don't play nice
+        # with np.load in session files (unless we change to have allow_pickle=True)
+        # so we just force them to be strings in glue
+        for component in results_data.components:
+            try:
+                if results_data[component].dtype == 'O':
+                    results_data[component] = results_data[component].astype('str')
+            except AttributeError:
+                pass
         
-        self._collect[f'{self.state.gene_set} for {self.state.subset.label}'] = output.results
+        self._collect.append(results_data)
         
+        if do_dialog:
+            confirm = dialog('New dataset created',
+                    f'The Dataset:\n'
+                    f'{new_name}\n'
+                    f'has been created.',
+                    'info')
+
         # Theoretically we could then join on the Genes column somehow...
         # But the Genes column is Gene1;Gene2; etc. so it is not trivial and probably it is not interesting to do this.
         

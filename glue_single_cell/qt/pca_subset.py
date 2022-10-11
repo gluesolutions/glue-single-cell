@@ -178,12 +178,8 @@ class GeneSummaryListener(HubListener):
                 mapping = {f'{self.basename}_{self.key}_{i}':k for i,k in enumerate(new_data.T)}
                 for x in self.target_dataset.components:  # This is to get the right component ids
                     xstr = f'{x.label}'
-                    #print(xstr)
                     if xstr in mapping.keys():
                         mapping[x] = mapping.pop(xstr)
-                        #del mapping[x.label]
-                #print(mapping)
-                #print([type(k) for k in mapping.keys()])
                 self.target_dataset.update_components(mapping)
                 
 
@@ -195,8 +191,6 @@ class GeneSummaryListener(HubListener):
         
     def receive_message(self, message):
         pass
-        #print("Message received:")
-        #print("{0}".format(message))
 
 class PCASubsetDialog(QtWidgets.QDialog):
 
