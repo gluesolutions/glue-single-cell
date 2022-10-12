@@ -303,6 +303,9 @@ def _save_anndata(data, context):
     result['meta'] = context.do(meta_filtered)
     
     result['sparse'] = context.do(data.sparse)
+    result['backed'] = context.do(data.backed)
+    #result['full_anndata_obj'] = context.do(data.full_anndata_obj)
+
 
     return result
 
@@ -448,6 +451,7 @@ def _load_anndata(rec, context):
         result.meta.update(context.object(rec['meta']))
     
     result.sparse = context.object(rec['sparse'])
+    result.backed = context.object(rec['backed'])
     yield result
     
     for l in rec['listeners']:
@@ -510,18 +514,20 @@ class DataAnnDataTranslator:
         obsm arrays have been flattened with var and obs arrays
         and some things (like .uns and layers) are ignored
 
-        How does this work with backed mode?
+        For files in backed mode we need to re-open the file.
         """
-     
+        
         if isinstance(data_or_subset, Subset):
             pass
         elif isinstance(data_or_subset, DataAnnData):
-            
             obs_glue_data = data_or_subset.meta['obs_data']
             var_glue_data = data_or_subset.meta['var_data']
             obs_data = self.unwrap_components(obs_glue_data)
             var_data = self.unwrap_components(var_glue_data)
-            adata = anndata.AnnData(data_or_subset['Xarray'], obs=obs_data, var=var_data)
+            if data_or_subset.backed:
+                adata = scanpy.read(data_or_subset.meta['full_filename'], sparse=True, backed='r')
+            else:
+                adata = anndata.AnnData(data_or_subset['Xarray'], obs=obs_data, var=var_data)
             return adata
         else:
             pass

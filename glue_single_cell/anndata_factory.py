@@ -160,6 +160,7 @@ def read_anndata(file_name, skip_dialog=False, skip_components=[], subsample=Fal
         XData = DataAnnData(Xarray=adata.X, backed=backed, label=f'{basename}_X')
 
     XData.meta['orig_filename'] = basename
+    XData.meta['full_filename'] = file_name
     XData.meta['Xdata'] = XData.uuid
     XData.meta['anndatatype'] = 'X Array'
     XData.meta['join_on_obs'] = True
