@@ -177,7 +177,7 @@ class TestCellSummary(object):
         self.do_calculation_on_multiple_datasets(calculation='Means')
         # If Module and backed mode we get this error
         #https://github.com/scverse/scanpy/issues/2153
-        #self.do_calculation_on_multiple_datasets(calculation='Module')
+        self.do_calculation_on_multiple_datasets(calculation='Module')
 
     def test_calculation_through_qtl(self):
         """

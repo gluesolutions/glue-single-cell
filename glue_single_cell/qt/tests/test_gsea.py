@@ -14,7 +14,7 @@ from ..pca_subset import dialog, PCASubsetDialog
 class TestEnrichr(object):
 
 
-    def get_data(self, try_backed=False):
+    def get_data(self):
 
         fake_data = Data(gene_id = ['Sox17','Adhfe1','Prex2','Msc','Rdh10','Gsta3'],
                    qtl = [1,2,3,4,5,5],

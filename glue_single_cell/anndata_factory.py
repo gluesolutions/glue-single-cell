@@ -141,7 +141,7 @@ def read_anndata(file_name, skip_dialog=False, skip_components=[], subsample=Fal
 
     if try_backed:
         try:
-            adata = sc.read(file_name, sparse=True, backed=try_backed)
+            adata = sc.read(file_name, sparse=True, backed='r')
             backed = True
         except OSError:
             adata = sc.read(file_name, sparse=True, backed=False)

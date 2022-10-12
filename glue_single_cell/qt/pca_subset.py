@@ -45,7 +45,7 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
     adata = data_with_Xarray.Xdata
     raw = False
     try: 
-        mask = genesubset.to_mask()
+        mask = genesubset.to_index_list()
     except IncompatibleAttribute:
         dialog('Failed', "Failed to generate a mask on the selected subset.", 'warn')
         print("Failed!") # TODO: Present a dialog box for this!
@@ -63,15 +63,18 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
         data_arr = adata_sel.obsm['X_pca']
     elif calculation == 'Module':
         adata_sel = adata[:, mask]  # This will fail if genesubset is not actually over genes
+        gene_list = list(adata_sel.var_names)
         try:
-            adata_sel = adata_sel.to_memory()
-        except ValueError:
-            pass
+            # TODO/FIXME: This could crash glue if a really large file is loaded into memory
+            # We do not need all genes in the reference dataset. We could subsample down to a
+            # "reasonable" number of genes, append our target genes and only load that into memory
+            adata_temp = adata.to_memory() 
+        except ValueError: # ValueError if data is already in memory
+            adata_temp = adata
         
-        gene_list = list(adata_sel.var_names)#[mask] #FIX ME We had to reapply mask IFF this was loading into memory? That seems odd
         try:
-            sc.tl.score_genes(adata, gene_list = gene_list)
-            data_arr = np.expand_dims(adata.obs['score'],axis=1)
+            sc.tl.score_genes(adata_temp, gene_list = gene_list)
+            data_arr = np.expand_dims(adata_temp.obs['score'],axis=1)
         except ValueError:
             print("No genes found!")
             return None
@@ -85,6 +88,7 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
         else:
+            #import ipdb; ipdb.set_trace()
             adata_sel = adata.X[: , mask]
             if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA

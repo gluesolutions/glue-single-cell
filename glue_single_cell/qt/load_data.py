@@ -70,7 +70,7 @@ class LoadDataDialog(QDialog):
         self.try_backed = None # This is the default for scanpy.read to read into memory
         self.skip_components = []
         self.subsample_factor = 1
-        trial_read = ad.read(filename,backed='r')
+        trial_read = ad.read(filename, backed='r')
         nobs = trial_read.n_obs
         nvars = trial_read.n_vars
         filesize = os.path.getsize(filename)
@@ -102,7 +102,7 @@ class LoadDataDialog(QDialog):
         system_mem,human_system_memory = get_system_memory()
         self.ui.label_system_memory.setText(str(human_system_memory))
 
-        if filesize > system_mem/4: # Make sure we have plenty of RAM
+        if filesize > system_mem/2: # Make sure we have plenty of RAM
             do_memory_warning = True
         else:
             do_memory_warning = False
