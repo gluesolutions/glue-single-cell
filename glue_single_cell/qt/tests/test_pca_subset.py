@@ -97,18 +97,11 @@ class TestCellSummarySession(object):
         dc = ga.session.data_collection
 
         assert len(dc) == 7
-        ## The problem is that this gene_summary_listener is NOT being saved
-        ## It is attached to a Data object, but only specific parts of a Data
-        ## object are saved/loaded. 
-
-        ## If we attach the gene_summary_listener to the DataAnnData object
-        ## we already have a custom saver/loader for that.
 
 
         assert len(dc[0].listeners) == 1
         assert len(dc[2].components) == 6
 
-        #sumdiag.state.genesubset.subset_state = d1_var.id['gene_stuff_0'] > 0
         dc.subset_groups[0].subset_state = dc[1].id['gene_stuff_0'] > 0
 
         assert np.sum(dc[2]['Subset 1_Means_0']) > 99
@@ -126,9 +119,6 @@ class TestCellSummary(object):
         d3 = Data(gene_id = ['Gene_2','Gene_3','Gene_5','Gene_8','Gene_11','Gene_12'],
                        qtl = [1,2,3,4,5,5],
                        label = 'qtl')
-        #self.app = GlueApplication()
-        #self.session = self.app.session
-        #self.hub = self.session.hub
         self.dc = DataCollection([d1, d2, d3])
 
         self.dc.append(d1)
