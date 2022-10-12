@@ -48,7 +48,6 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
         mask = genesubset.to_index_list()
     except IncompatibleAttribute:
         dialog('Failed', "Failed to generate a mask on the selected subset.", 'warn')
-        print("Failed!") # TODO: Present a dialog box for this!
         return None
     if mask.sum() == 0:
         return None
@@ -88,7 +87,6 @@ def do_calculation_over_gene_subset(data_with_Xarray, genesubset, calculation = 
                 data_arr = np.expand_dims(adata_sel.mean(axis=1),axis=1) 
 
         else:
-            #import ipdb; ipdb.set_trace()
             adata_sel = adata.X[: , mask]
             if data_with_Xarray.sparse == True:
                 data_arr = np.expand_dims(adata_sel.mean(axis=1).A1,axis=1)  # Expand to make same dimensionality as PCA

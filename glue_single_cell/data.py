@@ -5,11 +5,6 @@ The primary motivation is to support on-disk access
 to a dataset that (even sparse) may be too large
 to fit comfortably in memory.
 
-We store this data in a dual format, as both a native AnnData
-object AND as glue components. This allows us to call scanpy
-functions on the AnnData object without much additional
-bookkeeping. 
-
 AnnData objects include many things of different dimensions.
 This DataAnnData class only exposes the X matrix of data values
 with dimension num_obs x num_vars as a glue component. The other
@@ -22,12 +17,6 @@ All the varm arrays and var table are combined as one dataset
 
 The obsp and varp arrays could be extremely large and require
 a dedicated data class. We do not deal with these yet.
-
-Because of automatic sanitization 
-(see __[this issue](https://github.com/theislab/scanpy/issues/1747)__)
-we generally have to sanitize an AnnData object before using it in
-Scanpy. Since sanitization cannot be done on a subset, we sanitize
-the full dataset at initialization time.
 
 TODO: The anndata/scanpy convention of updating the data
 structure when new calculations are performed only works
@@ -55,7 +44,7 @@ from glue.core.component_id import ComponentID, ComponentIDDict, PixelComponentI
 
 from glue.core.component_link import ComponentLink, CoordinateComponentLink
 from glue.core.exceptions import IncompatibleAttribute
-    
+
 from fast_histogram import histogram1d, histogram2d
 
 from glue.core import data_factories as df
@@ -70,12 +59,17 @@ from glue.core.message import (DataMessage,
                                )
 from glue.core.state import (GlueSerializer, GlueUnSerializer,
                                 saver, loader, VersionedDict)
+from glue.core.state import _load_data_collection_4, _save_data_collection_4
+
 from glue.config import session_patch, data_translator
 
 import anndata
 import scanpy
 
 from pathlib import Path
+
+
+__all__ = ['DataAnnData', 'DataAnnDataTranslator']
 
 
 class DataAnnData(Data):
@@ -457,7 +451,6 @@ def _load_anndata(rec, context):
     for l in rec['listeners']:
         result.listeners.append(context.object(l))
 
-from glue.core.state import _load_data_collection_4, _save_data_collection_4
 
 @saver(DataCollection, version=5)
 def _save_data_collection_5(dc, context):
