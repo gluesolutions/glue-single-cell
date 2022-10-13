@@ -20,7 +20,7 @@ We recommend installing this plug-in into a new virtual environment:
 
 `conda activate single-cell`
 
-`conda install -c glueviz glueviz`
+`conda install -c conda-forge glueviz`
 
 `conda install -c conda-forge -c bioconda gseapy`
 
