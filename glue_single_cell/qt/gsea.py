@@ -57,7 +57,7 @@ class GSEApyDialog(QtWidgets.QDialog):
                     gene_subset = subset
         gene_list = gene_subset[self.state.gene_att]
         gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list] Maybe just for humans?
-        output = gseapy.enrichr(gene_list=gene_list_upper, description='pathway', organism='mouse', # Should be an option as well
+        output = gseapy.enrichr(gene_list=gene_list_upper, organism='mouse', # Should be an option as well
                              gene_sets=self.state.gene_set, no_plot=True)
         new_name = f'{self.state.gene_set} for {self.state.subset.label}'
         results_data = df_to_data(output.results,label=new_name)
