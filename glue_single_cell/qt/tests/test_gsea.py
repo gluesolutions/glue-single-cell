@@ -8,7 +8,7 @@ from glue.app.qt import GlueApplication
 from unittest.mock import patch
 from glue.core.state import GlueUnSerializer
 
-from ..gsea import GSEApyDialog
+from ..gsea import EnrichpyDialog
 from ..pca_subset import dialog, PCASubsetDialog
 
 class TestEnrichr(object):
@@ -34,7 +34,7 @@ class TestEnrichr(object):
         self.subset1 = self.dc.new_subset_group(label='Interesting Genes', subset_state=self.gene_data.id['qtl'] < 5)
 
     def do_enrichr(self):
-        gseadiag = GSEApyDialog(self.dc)
+        gseadiag = EnrichpyDialog(self.dc)
         gseadiag.state.data = self.dc[0]
         gseadiag.state.subset = self.subset1
         gseadiag.state.gene_att = self.dc[0].id['gene_id']

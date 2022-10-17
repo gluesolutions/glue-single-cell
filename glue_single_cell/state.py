@@ -3,21 +3,21 @@ from echo import SelectionCallbackProperty, CallbackProperty
 from glue.core.data_combo_helper import DataCollectionComboHelper, ComponentIDComboHelper, ComboHelper, ManualDataComboHelper
 from .data import DataAnnData
 
-__all__ = ['DiffGeneExpState', 'PCASubsetState', 'GSEApyState']
+__all__ = ['DiffGeneExpState', 'PCASubsetState', 'EnrichpyState']
 
 
-class GSEApyState(State):
+class EnrichpyState(State):
     data = SelectionCallbackProperty() # The data object to enrich
     subset = SelectionCallbackProperty() # Required: a subset that can be applied to data
     #organism = SelectionCallbackProperty()
     gene_set = SelectionCallbackProperty() # The Enrichr library to use. Could be linked to organism to get a filtered list.
-    # This is a terrible name, because it is confusing with gene subsets, but this is the GSEApy parameter name
+    # This is a terrible name, because it is confusing with gene subsets, but this is the Enrichpy parameter name
     gene_att = SelectionCallbackProperty() # The attribute with gene labels in it
 
     
     def __init__(self, data_collection):
         
-        super(GSEApyState, self).__init__()
+        super(EnrichpyState, self).__init__()
 
         self.data_collection = data_collection
         self.data_helper = DataCollectionComboHelper(self, 'data', data_collection)

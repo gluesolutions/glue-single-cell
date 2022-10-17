@@ -22,15 +22,12 @@ We recommend installing this plug-in into a new virtual environment:
 
 `conda install -c glueviz glueviz`
 
-`conda install -c conda-forge -c bioconda gseapy`
-
 `pip install git+https://github.com/gluesolutions/glue-single-cell.git`
 
 ## Manual
 
-If installing into an exsiting glue environment the additional requirements for this package are `scanpy`, `anndata`, and `gseapy`. However, gseapy installation from pip requires a rust compiler, so that installation may require the following conda command:
-
-`conda install -c conda-forge -c bioconda gseapy`
+If installing into an exsiting glue environment the additional requirements for this package are `scanpy`,
+`anndata`, and `enrichrpy` which can generally be installed via simply as:
 
 `pip install git+https://github.com/gluesolutions/glue-single-cell.git`
 
