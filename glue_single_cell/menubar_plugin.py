@@ -2,7 +2,7 @@ from glue.config import menubar_plugin
 
 from .qt.diff_gene_exp import DiffGeneExpDialog
 from .qt.pca_subset import PCASubsetDialog
-from .qt.gsea import EnrichpyDialog
+from .qt.enrichr import EnrichpyDialog
 
 
 @menubar_plugin("Scanpy Differential Gene Expression")
