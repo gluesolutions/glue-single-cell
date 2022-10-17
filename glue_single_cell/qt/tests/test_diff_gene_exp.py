@@ -40,7 +40,7 @@ class TestDiffGeneExp(object):
 
     def test_diff_gene_exp(self):
         
-        gene_list = get_gene_list_diff_exp(self.subset1, self.subset2, self.dd)
+        gene_list, dge_data = get_gene_list_diff_exp(self.subset1, self.subset2, self.dd)
         assert len(gene_list) == 50
 
 class TestDiffGeneExpBacked(TestDiffGeneExp):
