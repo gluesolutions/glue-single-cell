@@ -36,7 +36,7 @@ class EnrichpyDialog(QtWidgets.QDialog):
 
         self.state = EnrichpyState(collect)
 
-        self.ui = load_ui('gsea.ui', self,
+        self.ui = load_ui('enrichr.ui', self,
                           directory=os.path.dirname(__file__))
         self._connections = autoconnect_callbacks_to_qt(self.state, self.ui)
 
@@ -57,7 +57,8 @@ class EnrichpyDialog(QtWidgets.QDialog):
                     gene_subset = subset
         gene_list = gene_subset[self.state.gene_att]
         gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list] Maybe just for humans?
-        output_df = enrichrpy.enrichr.(gene_list_upper,gene_set_library=self.state.gene_set)
+        output_df = enrichrpy.enrichr.get_pathway_enrichment(gene_list_upper, gene_set_library=self.state.gene_set)
+        output_df['Overlapping genes'] = output_df['Overlapping genes'].apply(lambda x: '|'.join(x))
         new_name = f'{self.state.gene_set} for {self.state.subset.label}'
         results_data = df_to_data(output_df,label=new_name)
         # Output.results has Pandas Object types which don't play nice

@@ -8,7 +8,7 @@ from glue.app.qt import GlueApplication
 from unittest.mock import patch
 from glue.core.state import GlueUnSerializer
 
-from ..gsea import EnrichpyDialog
+from ..enrichr import EnrichpyDialog
 from ..pca_subset import dialog, PCASubsetDialog
 
 class TestEnrichr(object):
@@ -34,20 +34,20 @@ class TestEnrichr(object):
         self.subset1 = self.dc.new_subset_group(label='Interesting Genes', subset_state=self.gene_data.id['qtl'] < 5)
 
     def do_enrichr(self):
-        gseadiag = EnrichpyDialog(self.dc)
-        gseadiag.state.data = self.dc[0]
-        gseadiag.state.subset = self.subset1
-        gseadiag.state.gene_att = self.dc[0].id['gene_id']
-        gseadiag.state.gene_set = 'KEGG_2019_Mouse'
+        enrichrdiag = EnrichpyDialog(self.dc)
+        enrichrdiag.state.data = self.dc[0]
+        enrichrdiag.state.subset = self.subset1
+        enrichrdiag.state.gene_att = self.dc[0].id['gene_id']
+        enrichrdiag.state.gene_set = 'KEGG_2019_Mouse'
     
-        gseadiag._apply(do_dialog=False)
+        enrichrdiag._apply(do_dialog=False)
 
 
     def test_get_enrich(self):
         assert len(self.dc) == 1 # We add a new dataset
         self.do_enrichr()
         assert len(self.dc) == 2 # We add a new dataset
-        assert len(self.dc[1].components) == 11
+        assert len(self.dc[1].components) == 10
 
     def test_save_and_restore(self, tmpdir):
         self.do_enrichr()
