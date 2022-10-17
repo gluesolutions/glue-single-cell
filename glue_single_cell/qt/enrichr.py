@@ -6,12 +6,12 @@ import pandas as pd
 from glue.utils.qt import load_ui
 
 from ..anndata_factory import df_to_data
-from ..state import GSEApyState
+from ..state import EnrichpyState
 from .pca_subset import dialog
 
-import gseapy
+import enrichrpy.enrichr
 
-__all__ = ['GSEApyDialog']
+__all__ = ['EnrichpyDialog']
 
 def convert_genes_to_list(row):
     arr = row.split(';')
@@ -28,15 +28,15 @@ def convert_to_mouse_ids(row):
     """
     return [x.capitalize() for x in row]
 
-class GSEApyDialog(QtWidgets.QDialog):
+class EnrichpyDialog(QtWidgets.QDialog):
 
     def __init__(self, collect, default=None, parent=None):
 
-        super(GSEApyDialog, self).__init__(parent=parent)
+        super(EnrichpyDialog, self).__init__(parent=parent)
 
-        self.state = GSEApyState(collect)
+        self.state = EnrichpyState(collect)
 
-        self.ui = load_ui('gsea.ui', self,
+        self.ui = load_ui('enrichr.ui', self,
                           directory=os.path.dirname(__file__))
         self._connections = autoconnect_callbacks_to_qt(self.state, self.ui)
 
@@ -57,10 +57,10 @@ class GSEApyDialog(QtWidgets.QDialog):
                     gene_subset = subset
         gene_list = gene_subset[self.state.gene_att]
         gene_list_upper = [x for x in gene_list] #[x.upper() for x in gene_list] Maybe just for humans?
-        output = gseapy.enrichr(gene_list=gene_list_upper, organism='mouse', # Should be an option as well
-                             gene_sets=self.state.gene_set, no_plot=True)
+        output_df = enrichrpy.enrichr.get_pathway_enrichment(gene_list_upper, gene_set_library=self.state.gene_set)
+        output_df['Overlapping genes'] = output_df['Overlapping genes'].apply(lambda x: '|'.join(x))
         new_name = f'{self.state.gene_set} for {self.state.subset.label}'
-        results_data = df_to_data(output.results,label=new_name)
+        results_data = df_to_data(output_df,label=new_name)
         # Output.results has Pandas Object types which don't play nice
         # with np.load in session files (unless we change to have allow_pickle=True)
         # so we just force them to be strings in glue

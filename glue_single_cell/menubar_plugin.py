@@ -2,7 +2,7 @@ from glue.config import menubar_plugin
 
 from .qt.diff_gene_exp import DiffGeneExpDialog
 from .qt.pca_subset import PCASubsetDialog
-from .qt.gsea import GSEApyDialog
+from .qt.enrichr import EnrichpyDialog
 
 
 @menubar_plugin("Scanpy Differential Gene Expression")
@@ -18,7 +18,7 @@ def pca_subset_exp_plugin(session, data_collection):
     return
 
 @menubar_plugin("Enrich Gene Set via Enrichr")
-def gseapy_plugin(session, data_collection):
-    GSEApyDialog.enrich(data_collection,
+def enrichrpy_plugin(session, data_collection):
+    EnrichpyDialog.enrich(data_collection,
                             default=None, parent=None)
     return

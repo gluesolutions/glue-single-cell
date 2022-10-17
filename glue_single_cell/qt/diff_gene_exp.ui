@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>454</width>
-    <height>404</height>
+    <width>458</width>
+    <height>495</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,7 +17,7 @@
    <item row="0" column="0">
     <widget class="QLabel" name="label_5">
      <property name="text">
-      <string> This plug-in identifies the genes that are differentially expressed in two subsets of cells and creates a subset with those genes so that this subset can be used in further analysis. </string>
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This plug-in uses the &lt;a href=&quot;https://scanpy.readthedocs.io/en/stable/generated/scanpy.tl.rank_genes_groups.html&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;scanpy rank_genes_groups&lt;/span&gt;&lt;/a&gt; function to identify the genes that are differentially expressed in two subsets of cells and returns a subset with those genes as well as a linked dataset that be used to refine the dataset for further analysis. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignCenter</set>
@@ -25,12 +25,11 @@
      <property name="wordWrap">
       <bool>true</bool>
      </property>
-    </widget>
-   </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label">
-     <property name="text">
-      <string>Select the dataset over which to calculate differential gene expression:</string>
+     <property name="openExternalLinks">
+      <bool>true</bool>
+     </property>
+     <property name="textInteractionFlags">
+      <set>Qt::TextBrowserInteraction</set>
      </property>
     </widget>
    </item>
@@ -100,7 +99,7 @@
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Number of differentially expressed genes to return</string>
+        <string>Number of differentially expressed genes</string>
        </property>
       </widget>
      </item>
@@ -149,6 +148,13 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Select the dataset over which to calculate differential gene expression:</string>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
