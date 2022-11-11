@@ -24,7 +24,7 @@ def enrichrpy_plugin(session, data_collection):
                             default=None, parent=None)
     return
 
-@menubar_plugin("Display Subset in UCSD Genome Track Viewer")
+@menubar_plugin("Display Subset in UCSC Genome Track Viewer")
 def uscd_genome_plugin(session, data_collection):
     GenomeTrackViewerDialog.display(data_collection,
                               default=None, parent=None)

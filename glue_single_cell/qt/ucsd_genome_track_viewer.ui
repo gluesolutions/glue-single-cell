@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Display in UCSD Genome Track Viewer</string>
+   <string>Display in UCSC Genome Track Viewer</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="4" column="0">
