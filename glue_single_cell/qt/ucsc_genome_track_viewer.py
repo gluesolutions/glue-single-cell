@@ -51,7 +51,7 @@ class GenomeTrackViewerDialog(QtWidgets.QDialog):
 
         self.state = GenomeTrackViewerState(collect)
 
-        self.ui = load_ui('ucsd_genome_track_viewer.ui', self,
+        self.ui = load_ui('ucsc_genome_track_viewer.ui', self,
                           directory=os.path.dirname(__file__))
         self._connections = autoconnect_callbacks_to_qt(self.state, self.ui)
 

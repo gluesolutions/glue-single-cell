@@ -27,7 +27,7 @@ class QTLViewer(MatplotlibScatterMixin, MatplotlibDataViewer):
     _subset_artist_cls = QTLLayerArtist
     
     tools = ['select:rectangle', 'select:xrange',
-     'select:yrange']
+     'select:yrange', 'qtl:subset']
 
     def __init__(self, session, parent=None, state=None):
         proj = None
