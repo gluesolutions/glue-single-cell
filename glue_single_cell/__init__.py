@@ -4,7 +4,7 @@ def setup():
     from .menubar_plugin import diff_gene_exp_plugin  # noqa
     from .menubar_plugin import pca_subset_exp_plugin  # noqa
     from .menubar_plugin import enrichrpy_plugin # noqa
-    from .menubar_plugin import uscc_genome_plugin # noqa
+    from .menubar_plugin import ucsc_genome_plugin # noqa
     from .qtl_viewer.viewer import QTLViewer # noqa
 
     from glue.config import qt_client
