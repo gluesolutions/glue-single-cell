@@ -41,22 +41,7 @@ class GenomeTrackViewerState(State):
         
     def _on_data_change(self, *args, **kwargs):
         pass
-        #self.gene_att_helper.set_multiple_data([] if self.data is None else [self.data])
 
-
-class UcsdGenomeTrackViewer(QDialog):
-    def __init__(self, start_url):
-        super().__init__()
-        self.web = QWebEngineView()
-        self.web.setUrl(QtCore.QUrl(start_url))
-        #self.web.page().profile().downloadRequested.connect(self.handle_download)
-        self.web.show()
-
-        #self.layout = QVBoxLayout()
-        #self.layout.addWidget(self.web)
-        #self.layout.setContentsMargins(3, 3, 3, 3)
-
-        #self.setLayout(self.layout)
 
 class GenomeTrackViewerDialog(QtWidgets.QDialog):
 
@@ -66,7 +51,7 @@ class GenomeTrackViewerDialog(QtWidgets.QDialog):
 
         self.state = GenomeTrackViewerState(collect)
 
-        self.ui = load_ui('ucsd_genome_track_viewer.ui', self,
+        self.ui = load_ui('ucsc_genome_track_viewer.ui', self,
                           directory=os.path.dirname(__file__))
         self._connections = autoconnect_callbacks_to_qt(self.state, self.ui)
 
@@ -90,13 +75,18 @@ class GenomeTrackViewerDialog(QtWidgets.QDialog):
         gene_starts = gene_subset[self.state.data.id['gene_start']]
         gene_ends = gene_subset[self.state.data.id['gene_end']]
         browser_lines = "browser position chr5:137000000-150000000"
+        browser_lines_2 = "browser hide all"
+        browser_lines_3 = "browser dense knownGene"
         track_lines = "track name=coords description='Gene Subset from glue' color=96,39,254"
-        header_lines = "#chrom chrom chromStart chromEnd name"
+        header_lines = "#chrom chromStart chromEnd name"
         f = open('temp.bed', 'at', encoding='utf-8')
-        for header_string in [browser_lines, track_lines, header_lines]:
+        for header_string in [browser_lines, browser_lines_2, browser_lines_3, track_lines, header_lines]:
             f.write(header_string)
+            f.write(os.linesep)
         for name, start, end in zip(gene_names, gene_starts, gene_ends):
-            f.write(f"chr5   {start}    {end}    {name}")
+            if start < 151758149 and end < 151758149:
+                f.write(f"chr5\t{start}\t{end}\t{name}")
+                f.write(os.linesep)
         f.close()
         
         p1 = subprocess.run(["curl", "-s", "-F", "db=mm39", "-F", 'hgct_customText=@temp.bed', "http://genome.ucsc.edu/cgi-bin/hgCustom"],capture_output=True)        
@@ -104,10 +94,18 @@ class GenomeTrackViewerDialog(QtWidgets.QDialog):
             if 'hgsid=' in line:
                 hgsid = re.search('hgsid=(.*)"', line).group(1)
                 break
+                print(hgsid)
         start_url = f'http://genome.ucsc.edu/cgi-bin/hgTracks?hgsid={hgsid}&position=chr5:137000000-150000000'
-        genome_browser = QWebEngineView()
-        genome_browser.setUrl(QtCore.QUrl(start_url))
-        genome_browser.show()
+        self.web = QWebEngineView()
+        self.web.setUrl(QtCore.QUrl(start_url))
+        self.web.resize(1000,800)
+        self.web.show()
+        os.remove('temp.bed')
+        #self.layout = QVBoxLayout()
+        #self.layout.addWidget(self.web)
+        #self.layout.setContentsMargins(3, 3, 3, 3)
+        
+        #self.setLayout(self.layout)
 
     @classmethod
     def display(cls, collect, default=None, parent=None):
